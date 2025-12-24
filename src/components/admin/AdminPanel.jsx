@@ -18,7 +18,7 @@ const AdminPanel = ({ products }) => {
 
     const [masterProducts, setMasterProducts] = useState(products || []);
     const [isLoadingMaster, setIsLoadingMaster] = useState(false);
-    const [bulkSettings, setBulkSettings] = useState({ brand: 'All', normal: 0, silver: 0, gold: 0 });
+    const [bulkSettings, setBulkSettings] = useState({ brand: 'All', g3: 0, g4: 0, g5: 0, master: 0 });
 
     useEffect(() => {
         setUsers(authService.getUsers());
@@ -86,9 +86,10 @@ const AdminPanel = ({ products }) => {
         const targets = masterProducts.filter(p => bulkSettings.brand === 'All' || p.brand === bulkSettings.brand);
 
         targets.forEach(p => {
-            discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.NORMAL, bulkSettings.normal);
-            discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.SILVER, bulkSettings.silver);
-            discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.GOLD, bulkSettings.gold);
+            discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.G3, bulkSettings.g3);
+            discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.G4, bulkSettings.g4);
+            discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.G5, bulkSettings.g5);
+            discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.MASTER, bulkSettings.master);
         });
 
         setDiscounts({ ...discountService.getAllDiscounts() });
@@ -231,30 +232,39 @@ const AdminPanel = ({ products }) => {
                                         </select>
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[10px] text-blue-400 font-bold uppercase">NORMAL (%)</label>
+                                        <label className="text-[10px] text-blue-400 font-bold uppercase">등급 3 (%)</label>
                                         <input
                                             type="number"
                                             className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white"
-                                            value={bulkSettings.normal}
-                                            onChange={(e) => setBulkSettings({ ...bulkSettings, normal: e.target.value })}
+                                            value={bulkSettings.g3}
+                                            onChange={(e) => setBulkSettings({ ...bulkSettings, g3: e.target.value })}
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[10px] text-slate-300 font-bold uppercase">SILVER (%)</label>
+                                        <label className="text-[10px] text-slate-300 font-bold uppercase">등급 4 (%)</label>
                                         <input
                                             type="number"
                                             className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white"
-                                            value={bulkSettings.silver}
-                                            onChange={(e) => setBulkSettings({ ...bulkSettings, silver: e.target.value })}
+                                            value={bulkSettings.g4}
+                                            onChange={(e) => setBulkSettings({ ...bulkSettings, g4: e.target.value })}
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[10px] text-yellow-400 font-bold uppercase">GOLD (%)</label>
+                                        <label className="text-[10px] text-yellow-400 font-bold uppercase">등급 5 (%)</label>
                                         <input
                                             type="number"
                                             className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white"
-                                            value={bulkSettings.gold}
-                                            onChange={(e) => setBulkSettings({ ...bulkSettings, gold: e.target.value })}
+                                            value={bulkSettings.g5}
+                                            onChange={(e) => setBulkSettings({ ...bulkSettings, g5: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] text-purple-400 font-bold uppercase">MASTER (%)</label>
+                                        <input
+                                            type="number"
+                                            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white"
+                                            value={bulkSettings.master}
+                                            onChange={(e) => setBulkSettings({ ...bulkSettings, master: e.target.value })}
                                         />
                                     </div>
                                     <div className="flex items-end">
@@ -308,9 +318,10 @@ const AdminPanel = ({ products }) => {
                                         <thead className="bg-slate-50 text-slate-400 font-black uppercase tracking-widest border-b border-slate-100 sticky top-0 z-10">
                                             <tr>
                                                 <th className="px-6 py-4">패턴명 (상품명)</th>
-                                                <th className="px-6 py-4 text-center text-blue-600">NORMAL (%)</th>
-                                                <th className="px-6 py-4 text-center text-slate-600">SILVER (%)</th>
-                                                <th className="px-6 py-4 text-center text-yellow-600">GOLD (%)</th>
+                                                <th className="px-6 py-4 text-center text-blue-600">3 (%)</th>
+                                                <th className="px-6 py-4 text-center text-slate-600">4 (%)</th>
+                                                <th className="px-6 py-4 text-center text-yellow-600">5 (%)</th>
+                                                <th className="px-6 py-4 text-center text-purple-600">MASTER (%)</th>
                                                 <th className="px-6 py-4"></th>
                                             </tr>
                                         </thead>
@@ -333,11 +344,11 @@ const AdminPanel = ({ products }) => {
                                                                 </div>
                                                             </div>
                                                         </td>
-                                                        {[GRADES.NORMAL, GRADES.SILVER, GRADES.GOLD].map(grade => (
+                                                        {[GRADES.G3, GRADES.G4, GRADES.G5, GRADES.MASTER].map(grade => (
                                                             <td key={grade} className="px-6 py-4 text-center">
                                                                 <input
                                                                     type="number"
-                                                                    className={`w-16 text-center bg-white border border-slate-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500/20 font-black ${grade === GRADES.NORMAL ? 'text-blue-600 border-blue-100' : grade === GRADES.GOLD ? 'text-yellow-600 border-yellow-100' : ''}`}
+                                                                    className={`w-16 text-center bg-white border border-slate-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500/20 font-black ${grade === GRADES.G3 ? 'text-blue-600 border-blue-100' : grade === GRADES.G5 ? 'text-yellow-600 border-yellow-100' : grade === GRADES.MASTER ? 'text-purple-600 border-purple-100' : ''}`}
                                                                     value={discountService.getPatternDiscount(p.brand, p.pattern, p.model, grade)}
                                                                     onChange={(e) => handleDiscountUpdate(p.brand, p.pattern, p.model, grade, e.target.value)}
                                                                 />
@@ -348,7 +359,7 @@ const AdminPanel = ({ products }) => {
                                                                 onClick={() => {
                                                                     const rate = prompt(`[${p.pattern} ${p.model}] 모든 등급에 적용할 할인율(%)을 입력하세요:`, '0');
                                                                     if (rate !== null) {
-                                                                        [GRADES.NORMAL, GRADES.SILVER, GRADES.GOLD].forEach(g => {
+                                                                        [GRADES.G3, GRADES.G4, GRADES.G5, GRADES.MASTER].forEach(g => {
                                                                             discountService.setPatternDiscount(p.brand, p.pattern, p.model, g, rate);
                                                                         });
                                                                         setDiscounts({ ...discountService.getAllDiscounts() });

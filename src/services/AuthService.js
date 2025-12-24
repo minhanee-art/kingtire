@@ -9,9 +9,10 @@ const SESSION_KEY = 'kingtire_session';
 // Membership Grades
 export const GRADES = {
     PENDING: 'PENDING',
-    NORMAL: 'NORMAL',
-    SILVER: 'SILVER',
-    GOLD: 'GOLD',
+    G3: '3',
+    G4: '4',
+    G5: '5',
+    MASTER: 'MASTER',
     ADMIN: 'ADMIN'
 };
 
@@ -113,15 +114,13 @@ class DiscountService {
 
     // Get discount for a pattern
     getPatternDiscount(brand, pattern, model, grade) {
-        if (grade === GRADES.ADMIN) return 0;
+        // Only return 0 if it's literally not set, but allow ADMIN/MASTER to have discounts if set in DB
         const key = `${brand}|${pattern}|${model}`;
         return this.discounts[key]?.[grade] || 0;
     }
 
     // Legacy/Core method updated for new pattern key
     getDiscount(productCode, brand, pattern, model, grade) {
-        if (grade === GRADES.ADMIN) return 0;
-
         // Priority 1: Specific product code discount (if exists)
         if (this.discounts[productCode]?.[grade] !== undefined) {
             return this.discounts[productCode][grade];
