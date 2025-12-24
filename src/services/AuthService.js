@@ -1,0 +1,147 @@
+// Simple local ID generator since npm install failed
+const generateId = () => Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+
+// Simple mock storage keys
+const USERS_KEY = 'kingtire_users';
+const DISCOUNTS_KEY = 'kingtire_discounts';
+const SESSION_KEY = 'kingtire_session';
+
+// Membership Grades
+export const GRADES = {
+    PENDING: 'PENDING',
+    NORMAL: 'NORMAL',
+    SILVER: 'SILVER',
+    GOLD: 'GOLD',
+    ADMIN: 'ADMIN'
+};
+
+class AuthService {
+    constructor() {
+        this.users = JSON.parse(localStorage.getItem(USERS_KEY)) || [
+            {
+                id: 'admin-id',
+                email: 'admin@kingtire.com',
+                password: 'admin',
+                company: '대동타이어',
+                ceo: '관리자',
+                contact: '010-0000-0000',
+                businessNumber: '123-45-67890',
+                bankAccount: '기업 15207812304017 (주)대동휠앤타이어',
+                grade: GRADES.ADMIN,
+                isApproved: true
+            }
+        ];
+        this.currentUser = JSON.parse(localStorage.getItem(SESSION_KEY)) || null;
+    }
+
+    _saveUsers() {
+        localStorage.setItem(USERS_KEY, JSON.stringify(this.users));
+    }
+
+    _saveSession() {
+        localStorage.setItem(SESSION_KEY, JSON.stringify(this.currentUser));
+    }
+
+    signup(userData) {
+        const newUser = {
+            id: generateId(),
+            ...userData,
+            grade: GRADES.PENDING,
+            isApproved: false,
+            createdAt: new Date().toISOString()
+        };
+        this.users.push(newUser);
+        this._saveUsers();
+        return newUser;
+    }
+
+    login(email, password) {
+        const user = this.users.find(u => u.email === email && u.password === password);
+        if (user) {
+            this.currentUser = user;
+            this._saveSession();
+            return user;
+        }
+        throw new Error('이메일 또는 비밀번호가 올바르지 않습니다.');
+    }
+
+    logout() {
+        this.currentUser = null;
+        this._saveSession();
+    }
+
+    getUsers() {
+        return this.users;
+    }
+
+    updateUserGrade(userId, newGrade) {
+        const user = this.users.find(u => u.id === userId);
+        if (user) {
+            user.grade = newGrade;
+            user.isApproved = true;
+            this._saveUsers();
+            if (this.currentUser?.id === userId) {
+                this.currentUser = { ...user };
+                this._saveSession();
+            }
+        }
+    }
+
+    getCurrentUser() {
+        return this.currentUser;
+    }
+}
+
+class DiscountService {
+    constructor() {
+        this.discounts = JSON.parse(localStorage.getItem(DISCOUNTS_KEY)) || {};
+    }
+
+    _saveDiscounts() {
+        localStorage.setItem(DISCOUNTS_KEY, JSON.stringify(this.discounts));
+    }
+
+    // Set discount for a specific pattern (brand|pattern|model)
+    setPatternDiscount(brand, pattern, model, grade, rate) {
+        const key = `${brand}|${pattern}|${model}`;
+        if (!this.discounts[key]) {
+            this.discounts[key] = {};
+        }
+        this.discounts[key][grade] = Number(rate);
+        this._saveDiscounts();
+    }
+
+    // Get discount for a pattern
+    getPatternDiscount(brand, pattern, model, grade) {
+        if (grade === GRADES.ADMIN) return 0;
+        const key = `${brand}|${pattern}|${model}`;
+        return this.discounts[key]?.[grade] || 0;
+    }
+
+    // Legacy/Core method updated for new pattern key
+    getDiscount(productCode, brand, pattern, model, grade) {
+        if (grade === GRADES.ADMIN) return 0;
+
+        // Priority 1: Specific product code discount (if exists)
+        if (this.discounts[productCode]?.[grade] !== undefined) {
+            return this.discounts[productCode][grade];
+        }
+
+        // Priority 2: Pattern-based discount (brand|pattern|model)
+        const key = `${brand}|${pattern}|${model}`;
+        if (this.discounts[key]?.[grade] !== undefined) {
+            return this.discounts[key][grade];
+        }
+
+        // Priority 3: Fallback to old pattern key (brand|model)
+        const oldKey = `${brand}|${model}`;
+        return this.discounts[oldKey]?.[grade] || 0;
+    }
+
+    getAllDiscounts() {
+        return this.discounts;
+    }
+}
+
+export const authService = new AuthService();
+export const discountService = new DiscountService();
