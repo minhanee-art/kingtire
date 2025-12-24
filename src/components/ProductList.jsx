@@ -669,8 +669,9 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                                                     ) : (
                                                         <div className="flex items-center gap-2 group/input">
                                                             <input
-                                                                type="number"
-                                                                value={p.discountRate || 0}
+                                                                type="text"
+                                                                value={p.discountRate === 0 ? '' : p.discountRate}
+                                                                onFocus={(e) => e.target.select()}
                                                                 onChange={(e) => handleManualDiscountChange(p.internalCode, e.target.value)}
                                                                 className="w-14 text-center p-1.5 text-xs font-black border-2 border-slate-100 rounded-lg focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all bg-white"
                                                             />
@@ -840,7 +841,8 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                                             <div className={`w-20 flex items-center border rounded-lg h-9 px-2 transition-all ${isStoreMode ? 'bg-slate-50 border-slate-200' : 'bg-white border-blue-500/30 ring-2 ring-blue-500/5'}`}>
                                                 <input
                                                     type="text"
-                                                    value={discountRate}
+                                                    value={p.discountRate === 0 ? '' : p.discountRate}
+                                                    onFocus={(e) => e.target.select()}
                                                     onChange={(e) => handlePriceUpdate(p, 'discountRate', e.target.value.replace(/[^0-9]/g, ''))}
                                                     className={`w-full text-center text-xs font-black outline-none bg-transparent ${isStoreMode ? 'text-slate-400' : 'text-blue-600'}`}
                                                     readOnly={isStoreMode}
@@ -971,8 +973,9 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                                                 <span className="text-[9px] font-black text-slate-400 uppercase ml-1">할인율(%)</span>
                                                 <div className="flex items-center bg-white border border-slate-200 rounded-xl px-3 h-[38px]">
                                                     <input
-                                                        type="number"
-                                                        value={item.discountRate}
+                                                        type="text"
+                                                        value={item.discountRate === 0 ? '' : item.discountRate}
+                                                        onFocus={(e) => e.target.select()}
                                                         onChange={(e) => updateCartItemDiscount(idx, e.target.value)}
                                                         className="w-full text-center text-sm font-black text-blue-600 outline-none bg-transparent"
                                                     />
