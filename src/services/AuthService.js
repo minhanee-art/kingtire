@@ -12,6 +12,7 @@ export const GRADES = {
     G3: '3',
     G4: '4',
     G5: '5',
+    DC: 'DC',
     MASTER: 'MASTER',
     ADMIN: 'ADMIN'
 };
@@ -102,9 +103,9 @@ class DiscountService {
         localStorage.setItem(DISCOUNTS_KEY, JSON.stringify(this.discounts));
     }
 
-    // Set discount for a specific pattern (brand|pattern|model)
+    // Set discount for a specific pattern (brand|pattern)
     setPatternDiscount(brand, pattern, model, grade, rate) {
-        const key = `${brand}|${pattern}|${model}`;
+        const key = `${brand}|${pattern}`;
         if (!this.discounts[key]) {
             this.discounts[key] = {};
         }
@@ -112,10 +113,26 @@ class DiscountService {
         this._saveDiscounts();
     }
 
+    // Set discount for a specific size (SIZE|normalizedSize)
+    setSizeDiscount(size, grade, rate) {
+        const key = `SIZE|${size}`;
+        if (!this.discounts[key]) {
+            this.discounts[key] = {};
+        }
+        this.discounts[key][grade] = Number(rate);
+        this._saveDiscounts();
+    }
+
+    // Get discount for a size
+    getSizeDiscount(size, grade) {
+        const key = `SIZE|${size}`;
+        return this.discounts[key]?.[grade] || 0;
+    }
+
     // Get discount for a pattern
     getPatternDiscount(brand, pattern, model, grade) {
         // Only return 0 if it's literally not set, but allow ADMIN/MASTER to have discounts if set in DB
-        const key = `${brand}|${pattern}|${model}`;
+        const key = `${brand}|${pattern}`;
         return this.discounts[key]?.[grade] || 0;
     }
 
@@ -126,15 +143,25 @@ class DiscountService {
             return this.discounts[productCode][grade];
         }
 
-        // Priority 2: Pattern-based discount (brand|pattern|model)
-        const key = `${brand}|${pattern}|${model}`;
+        // Priority 2: Pattern-based discount (brand|pattern)
+        const key = `${brand}|${pattern}`;
         if (this.discounts[key]?.[grade] !== undefined) {
             return this.discounts[key][grade];
         }
 
-        // Priority 3: Fallback to old pattern key (brand|model)
-        const oldKey = `${brand}|${model}`;
-        return this.discounts[oldKey]?.[grade] || 0;
+        // Priority 3: Size-based discount (SIZE|normalizedSize)
+        const sizeKey = `SIZE|${String(size || '').replace(/[^0-9]/g, '')}`;
+        if (this.discounts[sizeKey]?.[grade] !== undefined) {
+            return this.discounts[sizeKey][grade];
+        }
+
+        // Priority 4: Model-based fallback (brand|model)
+        const modelKey = `${brand}|${model}`;
+        if (this.discounts[modelKey]?.[grade] !== undefined) {
+            return this.discounts[modelKey][grade];
+        }
+
+        return 0;
     }
 
     getAllDiscounts() {

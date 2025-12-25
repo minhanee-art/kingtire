@@ -50,16 +50,25 @@ const ComparisonModal = ({ selectedItems, onClose }) => {
                         {/* Product Columns */}
                         {selectedItems.map((item, idx) => (
                             <div key={item.code} className={`flex flex-col gap-6 p-6 rounded-3xl border transition-all duration-500 ${idx === 0 ? "bg-blue-50/30 border-blue-200" : "bg-white border-slate-100"}`}>
-                                {/* Thumbnail & Title */}
-                                <div className="h-[120px] flex flex-col items-center justify-center text-center gap-2">
-                                    <div className="w-20 h-20 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center p-2">
-                                        {item.imageUrl ? (
-                                            <img src={item.imageUrl} alt={item.model} className="w-full h-full object-contain" />
+                                {/* Thumbnail & Title with Logo Overlay */}
+                                <div className="h-[160px] flex flex-col items-center justify-center text-center gap-2 relative">
+                                    <div className="w-28 h-28 bg-white rounded-2xl shadow-md border border-slate-100 flex items-center justify-center p-3 relative group/img overflow-hidden">
+                                        {/* Brand Logo Overlay */}
+                                        <div className="absolute top-1 right-1 bg-slate-900/10 backdrop-blur-[2px] px-1.5 py-0.5 rounded text-[8px] font-black text-slate-900 uppercase tracking-tighter z-10">
+                                            {item.brand}
+                                        </div>
+
+                                        {(item.sheetImageUrl || item.imageUrl) ? (
+                                            <img
+                                                src={item.sheetImageUrl || item.imageUrl}
+                                                alt={item.model}
+                                                className="w-full h-full object-contain transition-transform group-hover/img:scale-110"
+                                            />
                                         ) : (
-                                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 font-bold">?</div>
+                                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 font-bold">?</div>
                                         )}
                                     </div>
-                                    <h4 className="text-sm font-black text-slate-900 truncate w-full">{item.model}</h4>
+                                    <h4 className="text-sm font-black text-slate-900 truncate w-full px-2">{item.model}</h4>
                                 </div>
 
                                 {/* Brand & ID */}

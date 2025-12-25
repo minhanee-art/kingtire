@@ -17,8 +17,11 @@ const AdminPanel = ({ products }) => {
     const [discounts, setDiscounts] = useState({});
 
     const [masterProducts, setMasterProducts] = useState(products || []);
+    const [allSizes, setAllSizes] = useState([]);
     const [isLoadingMaster, setIsLoadingMaster] = useState(false);
-    const [bulkSettings, setBulkSettings] = useState({ brand: 'All', g3: 0, g4: 0, g5: 0, master: 0 });
+    const [bulkSettings, setBulkSettings] = useState({ brand: 'All', g3: 0, g4: 0, g5: 0, dc: 0, master: 0 });
+    const [selectedPattern, setSelectedPattern] = useState('');
+    const [sizeSearch, setSizeSearch] = useState('');
 
     useEffect(() => {
         setUsers(authService.getUsers());
@@ -41,24 +44,33 @@ const AdminPanel = ({ products }) => {
                             );
                         });
 
-                    // Group by brand, pattern (PATTEN), and model
+                    // Group by brand and pattern
                     const grouped = [];
                     const seen = new Set();
 
                     filtered.forEach(d => {
-                        const key = `${d.brand}|${d.pattern}|${d.model}`;
+                        const brand = d.brand || 'Unknown';
+                        const pattern = d.pattern || d.model || 'Unknown'; // Fallback to model if pattern is empty
+                        const key = `${brand}|${pattern}`;
+
                         if (!seen.has(key)) {
                             seen.add(key);
                             grouped.push({
-                                brand: d.brand,
-                                pattern: d.pattern,
-                                model: d.model,
+                                brand: brand,
+                                pattern: pattern,
+                                model: d.model, // Just for reference
                                 patternKey: key
                             });
                         }
                     });
 
                     setMasterProducts(grouped);
+
+                    // Extract all unique sizes
+                    const uniqueSizes = Array.from(new Set(data.map(d => d.size)))
+                        .filter(Boolean)
+                        .sort();
+                    setAllSizes(uniqueSizes);
                 } catch (err) {
                     console.error('Master data load failed', err);
                 } finally {
@@ -89,11 +101,34 @@ const AdminPanel = ({ products }) => {
             discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.G3, bulkSettings.g3);
             discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.G4, bulkSettings.g4);
             discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.G5, bulkSettings.g5);
+            discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.DC, bulkSettings.dc);
             discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.MASTER, bulkSettings.master);
         });
 
         setDiscounts({ ...discountService.getAllDiscounts() });
         alert(`${targets.length}개 패턴의 할인율이 일괄 변경되었습니다.`);
+    };
+
+    const handlePatternBulkUpdate = () => {
+        if (!selectedPattern) return alert('패턴을 선택해주세요.');
+        const item = masterProducts.find(p => p.patternKey === selectedPattern);
+        if (!item) return;
+
+        const rates = prompt(`[${item.brand} ${item.pattern}] 3,4,5,DC 할인율을 콤마(,)로 구분하여 입력하세요 (예: 10,12,15,5):`, '0,0,0,0');
+        if (rates) {
+            const [g3, g4, g5, dc] = rates.split(',').map(r => r.trim());
+            discountService.setPatternDiscount(item.brand, item.pattern, item.model, GRADES.G3, g3 || 0);
+            discountService.setPatternDiscount(item.brand, item.pattern, item.model, GRADES.G4, g4 || 0);
+            discountService.setPatternDiscount(item.brand, item.pattern, item.model, GRADES.G5, g5 || 0);
+            discountService.setPatternDiscount(item.brand, item.pattern, item.model, GRADES.DC, dc || 0);
+            setDiscounts({ ...discountService.getAllDiscounts() });
+            alert('설정되었습니다.');
+        }
+    };
+
+    const handleSizeUpdate = (size, grade, rate) => {
+        discountService.setSizeDiscount(size, grade, rate);
+        setDiscounts({ ...discountService.getAllDiscounts() });
     };
 
     const filteredUsers = users.filter(u =>
@@ -259,6 +294,15 @@ const AdminPanel = ({ products }) => {
                                         />
                                     </div>
                                     <div className="space-y-1">
+                                        <label className="text-[10px] text-green-400 font-bold uppercase">DC (%)</label>
+                                        <input
+                                            type="number"
+                                            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white"
+                                            value={bulkSettings.dc}
+                                            onChange={(e) => setBulkSettings({ ...bulkSettings, dc: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
                                         <label className="text-[10px] text-purple-400 font-bold uppercase">MASTER (%)</label>
                                         <input
                                             type="number"
@@ -267,7 +311,7 @@ const AdminPanel = ({ products }) => {
                                             onChange={(e) => setBulkSettings({ ...bulkSettings, master: e.target.value })}
                                         />
                                     </div>
-                                    <div className="flex items-end">
+                                    <div className="flex items-end col-span-2 md:col-span-1">
                                         <button
                                             onClick={handleBulkUpdate}
                                             className="w-full h-[34px] bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-black text-xs transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
@@ -278,31 +322,85 @@ const AdminPanel = ({ products }) => {
                                 </div>
                             </div>
 
-                            <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
-                                <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
-                                    개별 상세 설정
-                                    <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">{masterProducts.length}</span>
-                                </h3>
-                                <div className="flex gap-2">
-                                    <select
-                                        className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                        value={selectedBrand}
-                                        onChange={(e) => setSelectedBrand(e.target.value)}
-                                    >
-                                        <option value="All">모든 브랜드</option>
-                                        {Array.from(new Set(masterProducts.map(p => p.brand))).filter(Boolean).map(b => (
-                                            <option key={b} value={b}>{b}</option>
-                                        ))}
-                                    </select>
-                                    <div className="relative">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                        <input
-                                            type="text"
-                                            placeholder="제품명 또는 규격 검색"
-                                            className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                            value={discountSearch}
-                                            onChange={(e) => setDiscountSearch(e.target.value)}
-                                        />
+                            <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex flex-col gap-6 shrink-0">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                                        패턴별 할인율 설정
+                                        <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">{masterProducts.length}</span>
+                                    </h3>
+                                    <div className="flex gap-2">
+                                        <select
+                                            className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                            value={selectedBrand}
+                                            onChange={(e) => setSelectedBrand(e.target.value)}
+                                        >
+                                            <option value="All">모든 브랜드</option>
+                                            {Array.from(new Set(masterProducts.map(p => p.brand))).filter(Boolean).sort().map(b => (
+                                                <option key={b} value={b}>{b}</option>
+                                            ))}
+                                        </select>
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                            <input
+                                                type="text"
+                                                placeholder="제품명 검색"
+                                                className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 w-40"
+                                                value={discountSearch}
+                                                onChange={(e) => setDiscountSearch(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Targeted Pattern Update */}
+                                    <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-3">
+                                        <div className="flex items-center gap-2 text-blue-600">
+                                            <Tag size={16} />
+                                            <span className="text-xs font-black uppercase">패턴별 일괄 설정</span>
+                                        </div>
+                                        <div className="flex flex-col gap-2">
+                                            <div className="flex gap-2">
+                                                <select
+                                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[11px] font-bold focus:outline-none"
+                                                    value={selectedBrand === 'All' ? '' : selectedBrand}
+                                                    onChange={(e) => setSelectedBrand(e.target.value || 'All')}
+                                                >
+                                                    <option value="">브랜드 선택</option>
+                                                    {Array.from(new Set(masterProducts.map(p => p.brand))).filter(Boolean).sort().map(b => (
+                                                        <option key={b} value={b}>{b}</option>
+                                                    ))}
+                                                </select>
+                                                <select
+                                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[11px] font-bold focus:outline-none"
+                                                    value={selectedPattern}
+                                                    onChange={(e) => setSelectedPattern(e.target.value)}
+                                                >
+                                                    <option value="">패턴 선택</option>
+                                                    {masterProducts
+                                                        .filter(p => selectedBrand === 'All' || p.brand === selectedBrand)
+                                                        .sort((a, b) => a.pattern.localeCompare(b.pattern))
+                                                        .map(p => (
+                                                            <option key={p.patternKey} value={p.patternKey}>{p.pattern}</option>
+                                                        ))
+                                                    }
+                                                </select>
+                                            </div>
+                                            <button
+                                                onClick={handlePatternBulkUpdate}
+                                                className="w-full bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-blue-600 transition-colors"
+                                            >
+                                                적정 패턴 할인율 설정
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Individual Size Search & Filter area placeholder (moved to table below) */}
+                                    <div className="p-4 bg-slate-50/50 border border-dashed border-slate-200 rounded-2xl flex items-center justify-center">
+                                        <div className="text-center">
+                                            <Search size={24} className="mx-auto text-slate-300 mb-2" />
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase">아래 사이즈 목록에서<br />개별 검색 및 설정 가능합니다</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -321,6 +419,7 @@ const AdminPanel = ({ products }) => {
                                                 <th className="px-6 py-4 text-center text-blue-600">3 (%)</th>
                                                 <th className="px-6 py-4 text-center text-slate-600">4 (%)</th>
                                                 <th className="px-6 py-4 text-center text-yellow-600">5 (%)</th>
+                                                <th className="px-6 py-4 text-center text-green-600">DC (%)</th>
                                                 <th className="px-6 py-4 text-center text-purple-600">MASTER (%)</th>
                                                 <th className="px-6 py-4"></th>
                                             </tr>
@@ -332,23 +431,25 @@ const AdminPanel = ({ products }) => {
                                                     p.pattern?.toLowerCase().includes(discountSearch.toLowerCase()) ||
                                                     p.model?.toLowerCase().includes(discountSearch.toLowerCase())
                                                 )
-                                                .slice(0, 500)
+                                                .slice(0, 300)
                                                 .map(p => (
                                                     <tr key={p.patternKey} className="hover:bg-slate-50/50 transition-colors">
                                                         <td className="px-6 py-4">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="bg-slate-900 text-white text-[9px] px-1.5 py-0.5 rounded font-black">{p.brand}</span>
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="bg-slate-900 text-white text-[9px] px-2 py-0.5 rounded font-black tracking-tighter uppercase">{p.brand}</span>
                                                                 <div className="flex flex-col">
-                                                                    <div className="font-black text-slate-900 text-sm">{p.pattern}</div>
-                                                                    <div className="text-[10px] text-slate-400">{p.model}</div>
+                                                                    <div className="font-black text-slate-900 text-sm tracking-tight">{p.pattern}</div>
+                                                                    {p.pattern !== p.model && (
+                                                                        <div className="text-[10px] text-slate-400 font-medium">대표 모델: {p.model}</div>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         </td>
-                                                        {[GRADES.G3, GRADES.G4, GRADES.G5, GRADES.MASTER].map(grade => (
+                                                        {[GRADES.G3, GRADES.G4, GRADES.G5, GRADES.DC, GRADES.MASTER].map(grade => (
                                                             <td key={grade} className="px-6 py-4 text-center">
                                                                 <input
                                                                     type="number"
-                                                                    className={`w-16 text-center bg-white border border-slate-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500/20 font-black ${grade === GRADES.G3 ? 'text-blue-600 border-blue-100' : grade === GRADES.G5 ? 'text-yellow-600 border-yellow-100' : grade === GRADES.MASTER ? 'text-purple-600 border-purple-100' : ''}`}
+                                                                    className={`w-14 text-center bg-white border border-slate-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500/20 font-black ${grade === GRADES.G3 ? 'text-blue-600 border-blue-100' : grade === GRADES.G5 ? 'text-yellow-600 border-yellow-100' : grade === GRADES.DC ? 'text-green-600 border-green-100' : grade === GRADES.MASTER ? 'text-purple-600 border-purple-100' : ''}`}
                                                                     value={discountService.getPatternDiscount(p.brand, p.pattern, p.model, grade)}
                                                                     onChange={(e) => handleDiscountUpdate(p.brand, p.pattern, p.model, grade, e.target.value)}
                                                                 />
@@ -359,7 +460,7 @@ const AdminPanel = ({ products }) => {
                                                                 onClick={() => {
                                                                     const rate = prompt(`[${p.pattern} ${p.model}] 모든 등급에 적용할 할인율(%)을 입력하세요:`, '0');
                                                                     if (rate !== null) {
-                                                                        [GRADES.G3, GRADES.G4, GRADES.G5, GRADES.MASTER].forEach(g => {
+                                                                        [GRADES.G3, GRADES.G4, GRADES.G5, GRADES.DC, GRADES.MASTER].forEach(g => {
                                                                             discountService.setPatternDiscount(p.brand, p.pattern, p.model, g, rate);
                                                                         });
                                                                         setDiscounts({ ...discountService.getAllDiscounts() });
@@ -376,6 +477,63 @@ const AdminPanel = ({ products }) => {
                                         </tbody>
                                     </table>
                                 )}
+
+                                {/* Individual Size Settings Section */}
+                                <div className="mt-8 px-6 pt-8 border-t border-slate-100">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                                            사이즈별 개별 설정
+                                            <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">{allSizes.length}</span>
+                                        </h3>
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                            <input
+                                                type="text"
+                                                placeholder="사이즈 검색 (예: 2454518)"
+                                                className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 w-56"
+                                                value={sizeSearch}
+                                                onChange={(e) => setSizeSearch(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
+                                        <table className="w-full text-left text-xs">
+                                            <thead className="bg-slate-50 text-slate-400 font-black uppercase tracking-widest border-b border-slate-100">
+                                                <tr>
+                                                    <th className="px-6 py-4">타이어 규격</th>
+                                                    <th className="px-6 py-4 text-center text-blue-600">3 (%)</th>
+                                                    <th className="px-6 py-4 text-center text-slate-600">4 (%)</th>
+                                                    <th className="px-6 py-4 text-center text-yellow-600">5 (%)</th>
+                                                    <th className="px-6 py-4 text-center text-green-600">DC (%)</th>
+                                                    <th className="px-6 py-4 text-center text-purple-600">MASTER (%)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-50 text-slate-600 font-bold">
+                                                {allSizes
+                                                    .filter(s => s.replace(/[^0-9]/g, '').includes(sizeSearch.replace(/[^0-9]/g, '')))
+                                                    .slice(0, 100)
+                                                    .map(size => (
+                                                        <tr key={size} className="hover:bg-slate-50/50 transition-colors">
+                                                            <td className="px-6 py-4">
+                                                                <div className="font-black text-slate-900 text-sm">{size}</div>
+                                                            </td>
+                                                            {[GRADES.G3, GRADES.G4, GRADES.G5, GRADES.DC, GRADES.MASTER].map(grade => (
+                                                                <td key={grade} className="px-6 py-4 text-center">
+                                                                    <input
+                                                                        type="number"
+                                                                        className={`w-14 text-center bg-white border border-slate-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500/20 font-black ${grade === GRADES.G3 ? 'text-blue-600' : grade === GRADES.G5 ? 'text-yellow-600' : grade === GRADES.DC ? 'text-green-600' : grade === GRADES.MASTER ? 'text-purple-600' : ''}`}
+                                                                        value={discountService.getSizeDiscount(size.replace(/\D/g, ''), grade)}
+                                                                        onChange={(e) => handleSizeUpdate(size.replace(/\D/g, ''), grade, e.target.value)}
+                                                                    />
+                                                                </td>
+                                                            ))}
+                                                        </tr>
+                                                    ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                                 {(!isLoadingMaster && masterProducts.length === 0) && (
                                     <div className="p-20 text-center text-slate-400">
                                         <Tag size={48} className="mx-auto mb-4 opacity-10" />

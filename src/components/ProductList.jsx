@@ -105,12 +105,17 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                 inventoryService.fetchShopItems(filter.size)
             ]);
 
+            console.log('[DEBUG] Sheet Data length:', sheetData?.length);
+            console.log('[DEBUG] Shop Data length:', productData?.length);
+
             // 3. Filter Sheet Data by Size and Price
             // Rule: Must match normalized size AND have factoryPrice > 0
             const filteredSheetEntries = sheetData.filter(d => {
                 const sheetSizeNorm = normalizeSize(d.size);
                 // match if sheet size (e.g. 2454519) matches search query
-                return sheetSizeNorm.includes(searchSizeNorm) && d.factoryPrice > 0;
+                const sizeMatch = sheetSizeNorm.includes(searchSizeNorm) || searchSizeNorm.includes(sheetSizeNorm);
+                // Allow showing products with 0 price if specifically searched (to avoid "No Results" confusion)
+                return sizeMatch;
             });
 
             console.log(`[Sheet Data] Found ${filteredSheetEntries.length} matching entries in sheet.`);
@@ -131,7 +136,7 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                 const shopMatch = findInventoryMatch(s.code);
 
                 // Calculate pattern-based discount (Brand + Pattern + Model)
-                const gradeDiscount = discountService.getDiscount(s.code, s.brand, s.pattern, s.model, user?.grade || 'NORMAL');
+                const gradeDiscount = discountService.getDiscount(s.code, s.brand, s.pattern, s.model, user?.grade || '3');
 
                 return {
                     brand: s.brand || (shopMatch?.brand),
@@ -149,7 +154,12 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                     features: s.features, // Custom features (tags) from Google Sheet
                     sheetImageUrl: s.imageUrl // Custom Image URL from Google Sheet
                 };
-            }).filter(p => p.factoryPrice > 0);
+            }); // Skip final filter to see if we get ANY results
+
+            console.log('[DEBUG] Merged Products length:', mergedProducts.length);
+            if (mergedProducts.length === 0) {
+                console.warn('[DEBUG] No products found. Check: 1. Normalized Size Match, 2. Factory Price > 0');
+            }
 
             if (onProductsLoaded) onProductsLoaded(mergedProducts);
 
@@ -796,16 +806,28 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                                                 </div>
                                             </div>
                                             {/* Mobile Comparison Button */}
-                                            <button
-                                                onClick={(e) => toggleCompare(p, e)}
-                                                className={`p-2.5 rounded-xl border-2 transition-all active:scale-90 flex items-center gap-1.5 ${compareList.some(item => item.internalCode === p.internalCode)
-                                                    ? "bg-blue-600 border-blue-600 text-white shadow-lg"
-                                                    : "bg-white border-slate-100 text-slate-400"
-                                                    }`}
-                                            >
-                                                <Activity size={18} />
-                                                <span className="text-[10px] font-black">비교</span>
-                                            </button>
+                                            <div className="flex flex-col gap-2">
+                                                <button
+                                                    onClick={(e) => toggleCompare(p, e)}
+                                                    className={`p-2.5 rounded-xl border-2 transition-all active:scale-90 flex items-center justify-center gap-1.5 ${compareList.some(item => item.internalCode === p.internalCode)
+                                                        ? "bg-blue-600 border-blue-600 text-white shadow-lg"
+                                                        : "bg-white border-slate-100 text-slate-400"
+                                                        }`}
+                                                >
+                                                    <Activity size={18} />
+                                                    <span className="text-[10px] font-black">비교</span>
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleAddItemToCart(p);
+                                                    }}
+                                                    className="p-2.5 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-xl transition-all active:scale-90 flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/10"
+                                                >
+                                                    <ShoppingCart size={18} />
+                                                    <span className="text-[10px] font-black">담기</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -884,15 +906,15 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                 </div>
             </div>
 
-            {/* Sticky Mobile Add to Cart Button */}
-            {selectedItems.length > 0 && (
+            {/* Sticky Mobile Quote Button */}
+            {cartItems.length > 0 && (
                 <div className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] z-40 animate-in slide-in-from-bottom-8">
                     <button
-                        onClick={addToCart}
-                        className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-500/30 flex items-center justify-center gap-3 active:scale-[0.98] transition-transform overflow-hidden group"
+                        onClick={() => setShowShareModal(true)}
+                        className="w-full py-4 bg-green-600 text-white font-black rounded-2xl shadow-xl shadow-green-500/30 flex items-center justify-center gap-3 active:scale-[0.98] transition-transform overflow-hidden group"
                     >
-                        <ShoppingBag size={24} className="group-hover:animate-bounce" />
-                        <span className="text-lg">장바구니에 {selectedItems.length}개 추가</span>
+                        <ShoppingCart size={24} className="group-hover:animate-bounce" />
+                        <span className="text-lg">장바구니 확인 ({cartItems.length}개)</span>
                         <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 rotate-12"></div>
                     </button>
                 </div>

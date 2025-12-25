@@ -30,17 +30,17 @@ const ShopLayout = ({ user, onLogout, onSetView, currentView, isStoreMode, onTog
                             </h1>
                         </div>
 
-                        <nav className="hidden md:flex items-center gap-1">
+                        <nav className="flex items-center gap-1">
                             <button
                                 onClick={() => onSetView('shop')}
-                                className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest transition-all ${currentView === 'shop' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400 hover:text-slate-900'}`}
+                                className={`px-3 sm:px-4 py-1.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all ${currentView === 'shop' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400 hover:text-slate-900'}`}
                             >
                                 Shop
                             </button>
                             {isAdmin && (
                                 <button
                                     onClick={() => onSetView('admin')}
-                                    className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest transition-all ${currentView === 'admin' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-blue-600'}`}
+                                    className={`px-3 sm:px-4 py-1.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all ${currentView === 'admin' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-blue-600'}`}
                                 >
                                     Admin
                                 </button>

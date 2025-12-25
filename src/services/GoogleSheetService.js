@@ -44,13 +44,14 @@ export const googleSheetService = {
                             });
 
                             // Extract Key Fields
-                            const code = (normalizedRow['code'] || normalizedRow['코드']) ? String(normalizedRow['code'] || normalizedRow['코드']).trim() : '';
-                            const size = (normalizedRow['size'] || normalizedRow['규격']) ? String(normalizedRow['size'] || normalizedRow['규격']).trim() : '';
-                            const brand = (normalizedRow['brand'] || normalizedRow['브랜드']) ? String(normalizedRow['brand'] || normalizedRow['브랜드']).trim() : '';
-                            const model = (normalizedRow['model'] || normalizedRow['상품명']) ? String(normalizedRow['model'] || normalizedRow['상품명']).trim() : '';
+                            const code = (normalizedRow['code'] || normalizedRow['코드'] || normalizedRow['고유코드']) ? String(normalizedRow['code'] || normalizedRow['코드'] || normalizedRow['고유코드']).trim() : '';
+                            const size = (normalizedRow['size'] || normalizedRow['규격'] || normalizedRow['규격/사이즈']) ? String(normalizedRow['size'] || normalizedRow['규격'] || normalizedRow['규격/사이즈']).trim() : '';
+                            const brand = (normalizedRow['brand'] || normalizedRow['브랜드'] || normalizedRow['제조사']) ? String(normalizedRow['brand'] || normalizedRow['브랜드'] || normalizedRow['제조사']).trim() : '';
+                            const model = (normalizedRow['model'] || normalizedRow['상품명'] || normalizedRow['모델명']) ? String(normalizedRow['model'] || normalizedRow['상품명'] || normalizedRow['모델명']).trim() : '';
                             const pattern = (normalizedRow['pattern'] || normalizedRow['patten'] || normalizedRow['패턴']) ? String(normalizedRow['pattern'] || normalizedRow['patten'] || normalizedRow['패턴']).trim() : '';
-                            const price = (normalizedRow['factory price'] || normalizedRow['공장도'] || normalizedRow['price']) ? String(normalizedRow['factory price'] || normalizedRow['공장도'] || normalizedRow['price']).replace(/[^0-9]/g, '') : '0';
-                            const features = normalizedRow['features'] || normalizedRow['특징'] || '';
+                            const priceCol = normalizedRow['factory price'] || normalizedRow['공장도'] || normalizedRow['공장도가'] || normalizedRow['공장'] || normalizedRow['price'];
+                            const price = priceCol ? String(priceCol).replace(/[^0-9]/g, '') : '0';
+                            const features = normalizedRow['features'] || normalizedRow['특징'] || normalizedRow['구분'] || '';
 
                             let imageUrl = '';
                             Object.keys(normalizedRow).forEach(key => {
@@ -89,6 +90,11 @@ export const googleSheetService = {
                                 imageUrl: imageUrl.trim()
                             };
                         });
+
+                        console.log(`[DEBUG] Google Sheet: Parsed ${parsedData.length} rows.`);
+                        if (parsedData.length > 0) {
+                            console.log('[DEBUG] First row sample:', parsedData[0]);
+                        }
 
                         // Update Cache
                         cachedSheetData = parsedData;
