@@ -137,7 +137,7 @@ class DiscountService {
     }
 
     // Legacy/Core method updated for new pattern key
-    getDiscount(productCode, brand, pattern, model, grade) {
+    getDiscount(productCode, brand, pattern, model, grade, sizeStr = '') {
         // Priority 1: Specific product code discount (if exists)
         if (this.discounts[productCode]?.[grade] !== undefined) {
             return this.discounts[productCode][grade];
@@ -150,7 +150,8 @@ class DiscountService {
         }
 
         // Priority 3: Size-based discount (SIZE|normalizedSize)
-        const sizeKey = `SIZE|${String(size || '').replace(/[^0-9]/g, '')}`;
+        const sizeInput = sizeStr || productCode; // fallback if size not provided
+        const sizeKey = `SIZE|${String(sizeInput || '').replace(/[^0-9]/g, '')}`;
         if (this.discounts[sizeKey]?.[grade] !== undefined) {
             return this.discounts[sizeKey][grade];
         }

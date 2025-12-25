@@ -131,10 +131,12 @@ const AdminPanel = ({ products }) => {
         setDiscounts({ ...discountService.getAllDiscounts() });
     };
 
-    const filteredUsers = users.filter(u =>
-        u.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredUsers = users.filter(u => {
+        const company = (u.company || '').toLowerCase();
+        const email = (u.email || '').toLowerCase();
+        const search = searchTerm.toLowerCase();
+        return company.includes(search) || email.includes(search);
+    });
 
     return (
         <div className="max-w-7xl mx-auto px-4 py-8 animate-in fade-in duration-500">
@@ -221,7 +223,13 @@ const AdminPanel = ({ products }) => {
                                                     )}
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <span className={`px-2 py-1 rounded text-[10px] font-black ${u.grade === GRADES.GOLD ? 'bg-yellow-100 text-yellow-700' : u.grade === GRADES.SILVER ? 'bg-slate-200 text-slate-700' : 'bg-blue-50 text-blue-700'}`}>
+                                                    <span className={`px-2 py-1 rounded text-[10px] font-black ${u.grade === GRADES.G5 ? 'bg-yellow-100 text-yellow-700' :
+                                                        u.grade === GRADES.G4 ? 'bg-slate-200 text-slate-700' :
+                                                            u.grade === GRADES.G3 ? 'bg-blue-50 text-blue-700' :
+                                                                u.grade === GRADES.MASTER ? 'bg-purple-100 text-purple-700' :
+                                                                    u.grade === GRADES.ADMIN ? 'bg-slate-900 text-white' :
+                                                                        'bg-slate-100 text-slate-500'
+                                                        }`}>
                                                         {u.grade}
                                                     </span>
                                                 </td>
@@ -541,6 +549,13 @@ const AdminPanel = ({ products }) => {
                                     </div>
                                 )}
                             </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'stats' && (
+                        <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-20">
+                            <BarChart3 size={48} className="opacity-10 mb-4" />
+                            <p className="font-black">준비 중인 기능입니다.</p>
                         </div>
                     )}
                 </div>

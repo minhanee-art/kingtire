@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Building2, Phone, FileText, Mail, Lock, Upload, CheckCircle2 } from 'lucide-react';
+import { User, Building2, Phone, FileText, Mail, Lock, Upload, CheckCircle2, CheckSquare } from 'lucide-react';
 import { authService } from '../../services/AuthService';
 
 const Signup = ({ onSwitchToLogin, onSignupSuccess }) => {
