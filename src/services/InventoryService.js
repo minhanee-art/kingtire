@@ -5,6 +5,8 @@ class InventoryService {
         this.products = [];
         this.inventory = [];
         this.initialized = false;
+        this.apiCache = new Map(); // Cache API results: key is sizeSearch, value is { data, expiry }
+        this.API_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
     }
 
     /**
@@ -33,6 +35,14 @@ class InventoryService {
      * Tries to fetch from the real proxy if configured, otherwise falls back to mock data.
      */
     async fetchShopItems(sizeSearch = '') {
+        // 1. Check Cache
+        const now = Date.now();
+        const cached = this.apiCache.get(sizeSearch);
+        if (cached && (now < cached.expiry)) {
+            console.log(`[Inventory] Serving cached API data for: ${sizeSearch}`);
+            return cached.data;
+        }
+
         // Feature Flag: Set to true if you have the proxy working and want to try real fetch
         const ENABLE_REAL_FETCH = true;
 
@@ -76,6 +86,13 @@ class InventoryService {
                 }
 
                 const parsedData = this.parseShopData(text);
+
+                // 2. Save to Cache
+                this.apiCache.set(sizeSearch, {
+                    data: parsedData,
+                    expiry: Date.now() + this.API_CACHE_TTL
+                });
+
                 // Return whatever the API gave us (empty if no valid items)
                 return parsedData;
 

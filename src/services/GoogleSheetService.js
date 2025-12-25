@@ -6,7 +6,8 @@ const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT
 // Cache configuration
 let cachedSheetData = null;
 let lastFetchTime = 0;
-const CACHE_TTL = 1 * 60 * 1000; // 1 minute in milliseconds
+const CACHE_TTL = 5 * 60 * 1000; // Increased to 5 minutes
+let sizeIndex = new Map(); // Store products grouped by normalized size for O(1) lookups
 
 /**
  * Service to fetch Data (Price, DOT, Info) from Google Sheets
@@ -100,6 +101,17 @@ export const googleSheetService = {
                         cachedSheetData = parsedData;
                         lastFetchTime = Date.now();
 
+                        // Build Size Index
+                        const newSizeIndex = new Map();
+                        parsedData.forEach(p => {
+                            const normSize = p.size.replace(/[^0-9]/g, '');
+                            if (!newSizeIndex.has(normSize)) {
+                                newSizeIndex.set(normSize, []);
+                            }
+                            newSizeIndex.get(normSize).push(p);
+                        });
+                        sizeIndex = newSizeIndex;
+
                         resolve(parsedData);
                     },
                     error: (error) => {
@@ -129,5 +141,13 @@ export const googleSheetService = {
         // Strict 2-word grouping as requested: prioritize model-based derivation
         if (modelWords.length >= 2) return `${modelWords[0]} ${modelWords[1]}`;
         return modelWords[0] || 'Unknown';
+    },
+
+    /**
+     * Fast lookup from index by normalized size string.
+     */
+    getBySize: (sizeStr) => {
+        const norm = (sizeStr || '').replace(/[^0-9]/g, '');
+        return sizeIndex.get(norm) || [];
     }
 };

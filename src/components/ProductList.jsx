@@ -124,23 +124,25 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
 
             console.log(`[Sheet Data] Found ${filteredSheetEntries.length} matching entries in sheet.`);
 
-            // 4. Create Stock Map from Blackcircles data
-            // We've captured uniqueCode, itId, and internalCode. We match against ANY of them.
-            const findInventoryMatch = (sheetCode) => {
-                const sCode = String(sheetCode || '').trim();
-                return productData.find(p => {
-                    return String(p.partNo || '').trim() === sCode ||
-                        String(p.itId || '').trim() === sCode ||
-                        String(p.stId || '').trim() === sCode;
-                });
-            };
+            // 4. Create Stock Map from Blackcircles data (O(N) to build, O(1) to lookup)
+            const inventoryMap = new Map();
+            productData.forEach(p => {
+                const partNo = String(p.partNo || '').trim();
+                const itId = String(p.itId || '').trim();
+                const stId = String(p.stId || '').trim();
+
+                if (partNo) inventoryMap.set(partNo, p);
+                if (itId) inventoryMap.set(itId, p);
+                if (stId) inventoryMap.set(stId, p);
+            });
 
             // 5. Merge Sheet Data with Live Stock
             const mergedProducts = filteredSheetEntries.map(s => {
-                const shopMatch = findInventoryMatch(s.code);
+                const shopMatch = inventoryMap.get(String(s.code || '').trim());
 
                 // Calculate pattern-based discount (Brand + Pattern + Model)
-                const gradeDiscount = discountService.getDiscount(s.code, s.brand, googleSheetService.getDerivedPattern(s), s.model, user?.grade || '3');
+                const gradePattern = googleSheetService.getDerivedPattern(s);
+                const gradeDiscount = discountService.getDiscount(s.code, s.brand, gradePattern, s.model, user?.grade || '3');
 
                 return {
                     brand: s.brand || (shopMatch?.brand),
@@ -154,9 +156,9 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                     officialDiscount: gradeDiscount,
                     discountRate: manualDiscounts[s.code] !== undefined ? manualDiscounts[s.code] : gradeDiscount,
                     internalCode: s.code,
-                    itId: shopMatch?.itId, // Ensure itId is passed for the detail modal
-                    features: s.features, // Custom features (tags) from Google Sheet
-                    sheetImageUrl: s.imageUrl // Custom Image URL from Google Sheet
+                    itId: shopMatch?.itId,
+                    features: s.features,
+                    sheetImageUrl: s.imageUrl
                 };
             }); // Skip final filter to see if we get ANY results
 
