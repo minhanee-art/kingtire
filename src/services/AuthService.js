@@ -12,7 +12,7 @@ export const GRADES = {
     G3: '3',
     G4: '4',
     G5: '5',
-    DC: 'DC',
+    SPECIAL: 'SPECIAL',
     MASTER: 'MASTER',
     ADMIN: 'ADMIN'
 };
@@ -89,7 +89,48 @@ class AuthService {
         }
     }
 
+    deleteUser(userId) {
+        const index = this.users.findIndex(u => u.id === userId);
+        if (index !== -1) {
+            this.users.splice(index, 1);
+            this._saveUsers();
+            if (this.currentUser?.id === userId) {
+                this.logout();
+            }
+            return true;
+        }
+        return false;
+    }
+
     getCurrentUser() {
+        return this.currentUser;
+    }
+
+    changePassword(oldPassword, newPassword) {
+        if (!this.currentUser) throw new Error('로그인이 필요합니다.');
+
+        const user = this.users.find(u => u.id === this.currentUser.id);
+        if (!user || user.password !== oldPassword) {
+            throw new Error('현재 비밀번호가 일치하지 않습니다.');
+        }
+
+        user.password = newPassword;
+        this.currentUser.password = newPassword;
+        this._saveUsers();
+        this._saveSession();
+        return true;
+    }
+
+    updateProfile(updatedData) {
+        if (!this.currentUser) throw new Error('로그인이 필요합니다.');
+
+        const index = this.users.findIndex(u => u.id === this.currentUser.id);
+        if (index === -1) throw new Error('사용자를 찾을 수 없습니다.');
+
+        this.users[index] = { ...this.users[index], ...updatedData };
+        this.currentUser = { ...this.currentUser, ...updatedData };
+        this._saveUsers();
+        this._saveSession();
         return this.currentUser;
     }
 }
@@ -134,6 +175,15 @@ class DiscountService {
         // Only return 0 if it's literally not set, but allow ADMIN/MASTER to have discounts if set in DB
         const key = `${brand}|${pattern}`;
         return this.discounts[key]?.[grade] || 0;
+    }
+
+    // Set discount for a specific product code (highest priority)
+    setCodeDiscount(code, grade, rate) {
+        if (!this.discounts[code]) {
+            this.discounts[code] = {};
+        }
+        this.discounts[code][grade] = Number(rate);
+        this._saveDiscounts();
     }
 
     // Legacy/Core method updated for new pattern key

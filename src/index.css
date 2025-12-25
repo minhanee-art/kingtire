@@ -39,8 +39,12 @@
 
 /* Base resets & improvements */
 body {
-  @apply selection:bg-blue-500/30 selection:text-blue-200;
+  @apply selection:bg-blue-500/30 selection:text-blue-200 transition-colors duration-300;
   -webkit-tap-highlight-color: transparent;
+}
+
+.dark body {
+  @apply bg-[#0B0F1A] text-slate-100;
 }
 
 /* Premium Animations */
@@ -48,8 +52,61 @@ body {
   @apply bg-slate-900/80 backdrop-blur-md border border-slate-700/50;
 }
 
+.dark .glass-effect {
+  @apply bg-black/80 border-slate-800/50;
+}
+
 .transition-premium {
   transition-property: all;
   transition-duration: 300ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Dark Mode Utilities - Refinement for higher contrast */
+.dark .bg-white {
+  /* Using a slightly lighter slate for cards to separate them from the background */
+  @apply bg-[#161F32] !important;
+}
+
+.dark .bg-slate-50 {
+  @apply bg-[#0B0F1A] !important;
+}
+
+.dark .text-slate-900 {
+  @apply text-white !important;
+}
+
+.dark .text-slate-600 {
+  @apply text-slate-300 !important;
+}
+
+.dark .text-slate-700 {
+  @apply text-slate-200 !important;
+}
+
+.dark .text-red-600 {
+  @apply text-red-400 !important;
+}
+
+.dark .border-slate-100,
+.dark .border-slate-200 {
+  @apply border-white/10 !important;
+}
+
+.dark .shadow-sm,
+.dark .shadow-md,
+.dark .shadow-lg,
+.dark .shadow-xl,
+.dark .shadow-2xl {
+  @apply shadow-black/60 !important;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+  @apply bg-[#1E293B] border-slate-700 text-white placeholder:text-slate-500 !important;
+}
+
+.dark .bg-blue-600 {
+  @apply bg-blue-500 !important;
 }

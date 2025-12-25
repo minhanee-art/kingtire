@@ -17,11 +17,20 @@ const AdminPanel = ({ products }) => {
     const [discounts, setDiscounts] = useState({});
 
     const [masterProducts, setMasterProducts] = useState(products || []);
+    const [fullMasterData, setFullMasterData] = useState([]); // All rows from sheet
     const [allSizes, setAllSizes] = useState([]);
     const [isLoadingMaster, setIsLoadingMaster] = useState(false);
-    const [bulkSettings, setBulkSettings] = useState({ brand: 'All', g3: 0, g4: 0, g5: 0, dc: 0, master: 0 });
+    const [bulkSettings, setBulkSettings] = useState({ brand: 'All', g3: 0, g4: 0, g5: 0, special: 0, master: 0 });
     const [selectedPattern, setSelectedPattern] = useState('');
+    const [selectedInch, setSelectedInch] = useState('All');
     const [sizeSearch, setSizeSearch] = useState('');
+    const [patternBulkRate, setPatternBulkRate] = useState('');
+
+    const getDerivedPattern = (row) => googleSheetService.getDerivedPattern(row);
+
+    useEffect(() => {
+        setSelectedInch('All');
+    }, [selectedPattern, selectedBrand]);
 
     useEffect(() => {
         setUsers(authService.getUsers());
@@ -32,10 +41,12 @@ const AdminPanel = ({ products }) => {
                 setIsLoadingMaster(true);
                 try {
                     const data = await googleSheetService.fetchSheetData();
+                    setFullMasterData(data); // Store everything for size filtering
+
                     // Filter by allowed brands AND factoryPrice > 0
                     const filtered = data
                         .filter(d => {
-                            if (d.factoryPrice <= 0) return false;
+                            if (d.factoryPrice <= 0 && activeTab !== 'discounts') return false; // allow 0 price in admin if needed, but usually not
                             const b = d.brand?.trim();
                             if (!b) return false;
                             return ALLOWED_BRANDS.some(allowed =>
@@ -44,13 +55,13 @@ const AdminPanel = ({ products }) => {
                             );
                         });
 
-                    // Group by brand and pattern
+                    // Group by brand and derived pattern
                     const grouped = [];
                     const seen = new Set();
 
                     filtered.forEach(d => {
                         const brand = d.brand || 'Unknown';
-                        const pattern = d.pattern || d.model || 'Unknown'; // Fallback to model if pattern is empty
+                        const pattern = getDerivedPattern(d);
                         const key = `${brand}|${pattern}`;
 
                         if (!seen.has(key)) {
@@ -58,7 +69,7 @@ const AdminPanel = ({ products }) => {
                             grouped.push({
                                 brand: brand,
                                 pattern: pattern,
-                                model: d.model, // Just for reference
+                                model: d.model,
                                 patternKey: key
                             });
                         }
@@ -81,10 +92,16 @@ const AdminPanel = ({ products }) => {
         loadMasterData();
     }, [activeTab]);
 
-    const handleGradeUpdate = (userId, grade) => {
-        authService.updateUserGrade(userId, grade);
+    const handleGradeUpdate = (userId, newGrade) => {
+        authService.updateUserGrade(userId, newGrade);
         setUsers([...authService.getUsers()]);
-        alert('등급이 변경되었습니다.');
+    };
+
+    const handleDeleteUser = (userId, company) => {
+        if (window.confirm(`[경고] ${company} 업체를 정말로 삭제하시겠습니까?\n이 작업은 되돌릴 수 없으며 해당 업체의 모든 정보가 삭제됩니다.`)) {
+            authService.deleteUser(userId);
+            setUsers([...authService.getUsers()]);
+        }
     };
 
     const handleDiscountUpdate = (brand, pattern, model, grade, rate) => {
@@ -101,7 +118,7 @@ const AdminPanel = ({ products }) => {
             discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.G3, bulkSettings.g3);
             discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.G4, bulkSettings.g4);
             discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.G5, bulkSettings.g5);
-            discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.DC, bulkSettings.dc);
+            discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.SPECIAL, bulkSettings.special);
             discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.MASTER, bulkSettings.master);
         });
 
@@ -109,20 +126,21 @@ const AdminPanel = ({ products }) => {
         alert(`${targets.length}개 패턴의 할인율이 일괄 변경되었습니다.`);
     };
 
-    const handlePatternBulkUpdate = () => {
-        if (!selectedPattern) return alert('패턴을 선택해주세요.');
-        const item = masterProducts.find(p => p.patternKey === selectedPattern);
-        if (!item) return;
+    const handleCodeDiscountUpdate = (code, grade, rate) => {
+        discountService.setCodeDiscount(code, grade, rate);
+        setDiscounts({ ...discountService.getAllDiscounts() });
+    };
 
-        const rates = prompt(`[${item.brand} ${item.pattern}] 3,4,5,DC 할인율을 콤마(,)로 구분하여 입력하세요 (예: 10,12,15,5):`, '0,0,0,0');
-        if (rates) {
-            const [g3, g4, g5, dc] = rates.split(',').map(r => r.trim());
-            discountService.setPatternDiscount(item.brand, item.pattern, item.model, GRADES.G3, g3 || 0);
-            discountService.setPatternDiscount(item.brand, item.pattern, item.model, GRADES.G4, g4 || 0);
-            discountService.setPatternDiscount(item.brand, item.pattern, item.model, GRADES.G5, g5 || 0);
-            discountService.setPatternDiscount(item.brand, item.pattern, item.model, GRADES.DC, dc || 0);
+    const applyPatternBulkRate = (rate) => {
+        const p = masterProducts.find(item => item.patternKey === selectedPattern);
+        if (!p) return;
+
+        setPatternBulkRate(rate);
+        if (rate !== '' && !isNaN(rate)) {
+            [GRADES.G3, GRADES.G4, GRADES.G5, GRADES.SPECIAL, GRADES.MASTER].forEach(g => {
+                discountService.setPatternDiscount(p.brand, p.pattern, p.model, g, rate);
+            });
             setDiscounts({ ...discountService.getAllDiscounts() });
-            alert('설정되었습니다.');
         }
     };
 
@@ -143,11 +161,11 @@ const AdminPanel = ({ products }) => {
             <div className="flex flex-col lg:flex-row gap-8">
                 {/* Sidebar */}
                 <div className="w-full lg:w-64 space-y-2">
-                    <div className="p-6 bg-slate-900 rounded-3xl mb-6 shadow-xl">
+                    <div className="p-6 bg-[#004F9F] rounded-3xl mb-6 shadow-xl border border-blue-500/20">
                         <h2 className="text-white font-black text-xl flex items-center gap-2">
-                            <Settings className="text-blue-400" /> Admin
+                            <Settings className="text-blue-200" /> Admin
                         </h2>
-                        <p className="text-slate-500 text-[10px] uppercase font-bold tracking-widest mt-1">System Management</p>
+                        <p className="text-blue-100 text-[10px] uppercase font-bold tracking-widest mt-1">System Management</p>
                     </div>
 
                     <button
@@ -198,9 +216,10 @@ const AdminPanel = ({ products }) => {
                                         <tr>
                                             <th className="px-6 py-4">업체정보</th>
                                             <th className="px-6 py-4">가입일</th>
-                                            <th className="px-6 py-4 text-center">승인상태</th>
+                                            <th className="px-6 py-4">승인상태</th>
                                             <th className="px-6 py-4">현재등급</th>
                                             <th className="px-6 py-4">등급변경</th>
+                                            <th className="px-6 py-4 text-center">관리</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50 text-slate-600 font-bold">
@@ -226,23 +245,38 @@ const AdminPanel = ({ products }) => {
                                                     <span className={`px-2 py-1 rounded text-[10px] font-black ${u.grade === GRADES.G5 ? 'bg-yellow-100 text-yellow-700' :
                                                         u.grade === GRADES.G4 ? 'bg-slate-200 text-slate-700' :
                                                             u.grade === GRADES.G3 ? 'bg-blue-50 text-blue-700' :
-                                                                u.grade === GRADES.MASTER ? 'bg-purple-100 text-purple-700' :
-                                                                    u.grade === GRADES.ADMIN ? 'bg-slate-900 text-white' :
-                                                                        'bg-slate-100 text-slate-500'
+                                                                u.grade === GRADES.SPECIAL ? 'bg-green-100 text-green-700' :
+                                                                    u.grade === GRADES.MASTER ? 'bg-purple-100 text-purple-700' :
+                                                                        u.grade === GRADES.ADMIN ? 'bg-slate-800 text-white' :
+                                                                            'bg-slate-100 text-slate-500'
                                                         }`}>
-                                                        {u.grade}
+                                                        {u.grade === GRADES.SPECIAL ? 'SPECIAL' : u.grade}
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <select
-                                                        className="bg-white border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                                        value={u.grade}
-                                                        onChange={(e) => handleGradeUpdate(u.id, e.target.value)}
-                                                    >
-                                                        {Object.values(GRADES).filter(g => g !== GRADES.PENDING).map(g => (
-                                                            <option key={g} value={g}>{g}</option>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {Object.values(GRADES).filter(g => g !== GRADES.PENDING && g !== GRADES.ADMIN).map(g => (
+                                                            <button
+                                                                key={g}
+                                                                onClick={() => handleGradeUpdate(u.id, g)}
+                                                                className={`px-2 py-1 rounded border text-[9px] font-black transition-all ${u.grade === g
+                                                                    ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                                                                    : 'bg-white border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-600'
+                                                                    }`}
+                                                            >
+                                                                {g}
+                                                            </button>
                                                         ))}
-                                                    </select>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <button
+                                                        onClick={() => handleDeleteUser(u.id, u.company)}
+                                                        className="p-1.5 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-lg transition-colors"
+                                                        title="업체 삭제"
+                                                    >
+                                                        <XCircle size={16} />
+                                                    </button>
                                                 </td>
                                             </tr>
                                         ))}
@@ -255,16 +289,16 @@ const AdminPanel = ({ products }) => {
                     {activeTab === 'discounts' && (
                         <div className="flex-1 flex flex-col h-full overflow-hidden">
                             {/* Bulk Update Controls */}
-                            <div className="p-6 bg-slate-900 text-white border-b border-slate-800 shrink-0">
+                            <div className="p-6 bg-slate-50 border-b border-slate-200 shrink-0">
                                 <div className="flex items-center gap-2 mb-4">
-                                    <Zap className="text-yellow-400" size={20} />
-                                    <h4 className="font-black">브랜드별 일괄 할인 설정</h4>
+                                    <Zap className="text-blue-600" size={20} />
+                                    <h4 className="font-black text-slate-900">브랜드별 일괄 할인 설정</h4>
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                                     <div className="space-y-1">
-                                        <label className="text-[10px] text-slate-400 font-bold uppercase">대상 브랜드</label>
+                                        <label className="text-[10px] text-slate-500 font-bold uppercase">대상 브랜드</label>
                                         <select
-                                            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none"
+                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                             value={bulkSettings.brand}
                                             onChange={(e) => setBulkSettings({ ...bulkSettings, brand: e.target.value })}
                                         >
@@ -275,47 +309,57 @@ const AdminPanel = ({ products }) => {
                                         </select>
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[10px] text-blue-400 font-bold uppercase">등급 3 (%)</label>
+                                        <label className="text-[10px] text-blue-600 font-bold uppercase">등급 3 (%)</label>
                                         <input
                                             type="number"
-                                            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white"
+                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                             value={bulkSettings.g3}
+                                            onFocus={(e) => e.target.value === '0' && (e.target.value = '')}
+                                            onBlur={(e) => e.target.value === '' && (e.target.value = '0')}
                                             onChange={(e) => setBulkSettings({ ...bulkSettings, g3: e.target.value })}
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[10px] text-slate-300 font-bold uppercase">등급 4 (%)</label>
+                                        <label className="text-[10px] text-slate-500 font-bold uppercase">등급 4 (%)</label>
                                         <input
                                             type="number"
-                                            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white"
+                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                             value={bulkSettings.g4}
+                                            onFocus={(e) => e.target.value === '0' && (e.target.value = '')}
+                                            onBlur={(e) => e.target.value === '' && (e.target.value = '0')}
                                             onChange={(e) => setBulkSettings({ ...bulkSettings, g4: e.target.value })}
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[10px] text-yellow-400 font-bold uppercase">등급 5 (%)</label>
+                                        <label className="text-[10px] text-yellow-600 font-bold uppercase">등급 5 (%)</label>
                                         <input
                                             type="number"
-                                            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white"
+                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                             value={bulkSettings.g5}
+                                            onFocus={(e) => e.target.value === '0' && (e.target.value = '')}
+                                            onBlur={(e) => e.target.value === '' && (e.target.value = '0')}
                                             onChange={(e) => setBulkSettings({ ...bulkSettings, g5: e.target.value })}
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[10px] text-green-400 font-bold uppercase">DC (%)</label>
+                                        <label className="text-[10px] text-green-600 font-bold uppercase">SPECIAL (%)</label>
                                         <input
                                             type="number"
-                                            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white"
-                                            value={bulkSettings.dc}
-                                            onChange={(e) => setBulkSettings({ ...bulkSettings, dc: e.target.value })}
+                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                            value={bulkSettings.special}
+                                            onFocus={(e) => e.target.value === '0' && (e.target.value = '')}
+                                            onBlur={(e) => e.target.value === '' && (e.target.value = '0')}
+                                            onChange={(e) => setBulkSettings({ ...bulkSettings, special: e.target.value })}
                                         />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[10px] text-purple-400 font-bold uppercase">MASTER (%)</label>
+                                        <label className="text-[10px] text-purple-600 font-bold uppercase">MASTER (%)</label>
                                         <input
                                             type="number"
-                                            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-white"
+                                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                             value={bulkSettings.master}
+                                            onFocus={(e) => e.target.value === '0' && (e.target.value = '')}
+                                            onBlur={(e) => e.target.value === '' && (e.target.value = '0')}
                                             onChange={(e) => setBulkSettings({ ...bulkSettings, master: e.target.value })}
                                         />
                                     </div>
@@ -360,19 +404,22 @@ const AdminPanel = ({ products }) => {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {/* Targeted Pattern Update */}
-                                    <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-3">
-                                        <div className="flex items-center gap-2 text-blue-600">
-                                            <Tag size={16} />
-                                            <span className="text-xs font-black uppercase">패턴별 일괄 설정</span>
-                                        </div>
-                                        <div className="flex flex-col gap-2">
-                                            <div className="flex gap-2">
+                                <div className="grid grid-cols-1 gap-4">
+                                    {/* Targeted Pattern Update - Expanded */}
+                                    <div className="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-6">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2 text-blue-600">
+                                                <Tag size={18} />
+                                                <span className="text-sm font-black uppercase">패턴별 세부 설정</span>
+                                            </div>
+                                            <div className="flex gap-2 w-2/3">
                                                 <select
-                                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[11px] font-bold focus:outline-none"
+                                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none"
                                                     value={selectedBrand === 'All' ? '' : selectedBrand}
-                                                    onChange={(e) => setSelectedBrand(e.target.value || 'All')}
+                                                    onChange={(e) => {
+                                                        setSelectedBrand(e.target.value || 'All');
+                                                        setSelectedPattern('');
+                                                    }}
                                                 >
                                                     <option value="">브랜드 선택</option>
                                                     {Array.from(new Set(masterProducts.map(p => p.brand))).filter(Boolean).sort().map(b => (
@@ -380,7 +427,7 @@ const AdminPanel = ({ products }) => {
                                                     ))}
                                                 </select>
                                                 <select
-                                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-[11px] font-bold focus:outline-none"
+                                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none"
                                                     value={selectedPattern}
                                                     onChange={(e) => setSelectedPattern(e.target.value)}
                                                 >
@@ -393,22 +440,76 @@ const AdminPanel = ({ products }) => {
                                                         ))
                                                     }
                                                 </select>
-                                            </div>
-                                            <button
-                                                onClick={handlePatternBulkUpdate}
-                                                className="w-full bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-blue-600 transition-colors"
-                                            >
-                                                적정 패턴 할인율 설정
-                                            </button>
-                                        </div>
-                                    </div>
+                                                <select
+                                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none"
+                                                    value={selectedInch}
+                                                    onChange={(e) => setSelectedInch(e.target.value)}
+                                                >
+                                                    <option value="All">인치 선택</option>
+                                                    {(() => {
+                                                        if (!selectedPattern) return null;
+                                                        const [sBrand, sPat] = selectedPattern.split('|');
+                                                        const patternItems = fullMasterData.filter(d =>
+                                                            (d.brand === sBrand) && (googleSheetService.getDerivedPattern(d) === sPat)
+                                                        );
+                                                        const inches = Array.from(new Set(patternItems.map(d => {
+                                                            // More robust inch extraction: look for 2 digits either after R or at the end of a group
+                                                            const match = d.size?.match(/R(\d{2})/i) || d.size?.match(/\s(\d{2})$/) || d.size?.match(/(\d{2})$/);
+                                                            return match ? match[1] : null;
+                                                        }).filter(Boolean))).sort((a, b) => Number(a) - Number(b));
 
-                                    {/* Individual Size Search & Filter area placeholder (moved to table below) */}
-                                    <div className="p-4 bg-slate-50/50 border border-dashed border-slate-200 rounded-2xl flex items-center justify-center">
-                                        <div className="text-center">
-                                            <Search size={24} className="mx-auto text-slate-300 mb-2" />
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase">아래 사이즈 목록에서<br />개별 검색 및 설정 가능합니다</p>
+                                                        return inches.map(inch => (
+                                                            <option key={inch} value={inch}>{inch}인치</option>
+                                                        ));
+                                                    })()}
+                                                </select>
+                                            </div>
                                         </div>
+
+                                        {selectedPattern && masterProducts.find(p => p.patternKey === selectedPattern) && (
+                                            <div className="bg-slate-50 rounded-2xl p-6 animate-in slide-in-from-top-2 duration-300">
+                                                <div className="flex items-center gap-2 mb-4 text-xs font-black text-slate-500 uppercase">
+                                                    <ChevronRight size={14} className="text-blue-500" /> 패턴 통합 할인율 설정 (전체 사이즈 적용)
+                                                </div>
+                                                <div className="grid grid-cols-2 md:grid-cols-6 gap-4 items-end">
+                                                    {[GRADES.G3, GRADES.G4, GRADES.G5, GRADES.SPECIAL, GRADES.MASTER].map(grade => {
+                                                        const p = masterProducts.find(item => item.patternKey === selectedPattern);
+                                                        return (
+                                                            <div key={grade} className="space-y-1.5">
+                                                                <label className={`text-[10px] font-black uppercase tracking-wider ${grade === GRADES.G3 ? 'text-blue-500' : grade === GRADES.G5 ? 'text-yellow-600' : grade === GRADES.SPECIAL ? 'text-green-600' : grade === GRADES.MASTER ? 'text-purple-600' : 'text-slate-400'}`}>
+                                                                    Grade {grade} (%)
+                                                                </label>
+                                                                <input
+                                                                    type="number"
+                                                                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-black focus:ring-2 focus:ring-blue-500/20"
+                                                                    value={discountService.getPatternDiscount(p.brand, p.pattern, p.model, grade)}
+                                                                    onFocus={(e) => e.target.value === '0' && (e.target.value = '')}
+                                                                    onBlur={(e) => e.target.value === '' && (e.target.value = '0')}
+                                                                    onChange={(e) => {
+                                                                        discountService.setPatternDiscount(p.brand, p.pattern, p.model, grade, e.target.value);
+                                                                        setDiscounts({ ...discountService.getAllDiscounts() });
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    <div className="space-y-1.5 min-w-[100px]">
+                                                        <label className="text-[10px] font-black uppercase text-blue-600">전체 일괄(%)</label>
+                                                        <div className="flex gap-2">
+                                                            <input
+                                                                type="number"
+                                                                className="w-full bg-white border border-blue-400 rounded-xl px-3 py-2 text-sm font-black focus:ring-2 focus:ring-blue-500/20 shadow-sm"
+                                                                placeholder="0"
+                                                                value={patternBulkRate}
+                                                                onFocus={(e) => e.target.value === '0' && (e.target.value = '')}
+                                                                onBlur={(e) => e.target.value === '' && (e.target.value = '0')}
+                                                                onChange={(e) => applyPatternBulkRate(e.target.value)}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -423,130 +524,75 @@ const AdminPanel = ({ products }) => {
                                     <table className="w-full text-left text-xs">
                                         <thead className="bg-slate-50 text-slate-400 font-black uppercase tracking-widest border-b border-slate-100 sticky top-0 z-10">
                                             <tr>
-                                                <th className="px-6 py-4">패턴명 (상품명)</th>
+                                                <th className="px-6 py-4">패턴 하위 규격별 상세 설정 (개별 우대 적용)</th>
                                                 <th className="px-6 py-4 text-center text-blue-600">3 (%)</th>
                                                 <th className="px-6 py-4 text-center text-slate-600">4 (%)</th>
                                                 <th className="px-6 py-4 text-center text-yellow-600">5 (%)</th>
-                                                <th className="px-6 py-4 text-center text-green-600">DC (%)</th>
+                                                <th className="px-6 py-4 text-center text-green-600">SPECIAL (%)</th>
                                                 <th className="px-6 py-4 text-center text-purple-600">MASTER (%)</th>
-                                                <th className="px-6 py-4"></th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 text-slate-600 font-bold">
-                                            {masterProducts
-                                                .filter(p => selectedBrand === 'All' || p.brand === selectedBrand)
-                                                .filter(p =>
-                                                    p.pattern?.toLowerCase().includes(discountSearch.toLowerCase()) ||
-                                                    p.model?.toLowerCase().includes(discountSearch.toLowerCase())
-                                                )
-                                                .slice(0, 300)
-                                                .map(p => (
-                                                    <tr key={p.patternKey} className="hover:bg-slate-50/50 transition-colors">
+                                            {(() => {
+                                                // Determine items to show
+                                                let displayItems = [];
+                                                if (selectedPattern) {
+                                                    const [sBrand, sPat] = selectedPattern.split('|');
+                                                    const patternItems = fullMasterData.filter(d =>
+                                                        (d.brand === sBrand) && (googleSheetService.getDerivedPattern(d) === sPat)
+                                                    );
+
+                                                    displayItems = patternItems;
+
+                                                    if (selectedInch !== 'All') {
+                                                        displayItems = displayItems.filter(d => {
+                                                            const match = d.size?.match(/R(\d{2})/i) || d.size?.match(/\s(\d{2})$/) || d.size?.match(/(\d{2})$/);
+                                                            return match && match[1] === selectedInch;
+                                                        });
+                                                    }
+
+                                                    // Add alphanumeric sort for sizes
+                                                    displayItems.sort((a, b) => (a.size || '').localeCompare(b.size || '', undefined, { numeric: true }));
+                                                } else {
+                                                    // Default: Show all filtered by search/brand if no specific pattern selected
+                                                    displayItems = fullMasterData
+                                                        .filter(p => selectedBrand === 'All' || p.brand === selectedBrand)
+                                                        .filter(p =>
+                                                            p.pattern?.toLowerCase().includes(discountSearch.toLowerCase()) ||
+                                                            p.model?.toLowerCase().includes(discountSearch.toLowerCase()) ||
+                                                            p.size?.toLowerCase().includes(discountSearch.toLowerCase())
+                                                        )
+                                                        .slice(0, 100);
+                                                }
+
+                                                return displayItems.map(p => (
+                                                    <tr key={p.code} className="hover:bg-slate-50/50 transition-colors">
                                                         <td className="px-6 py-4">
                                                             <div className="flex items-center gap-3">
-                                                                <span className="bg-slate-900 text-white text-[9px] px-2 py-0.5 rounded font-black tracking-tighter uppercase">{p.brand}</span>
+                                                                <span className="bg-[#004F9F] text-white text-[9px] px-2 py-0.5 rounded font-black tracking-tighter uppercase">{p.brand}</span>
                                                                 <div className="flex flex-col">
-                                                                    <div className="font-black text-slate-900 text-sm tracking-tight">{p.pattern}</div>
-                                                                    {p.pattern !== p.model && (
-                                                                        <div className="text-[10px] text-slate-400 font-medium">대표 모델: {p.model}</div>
-                                                                    )}
+                                                                    <div className="font-black text-slate-900 text-sm tracking-tight">{p.model}</div>
+                                                                    <div className="text-[10px] text-blue-600 font-black">{p.size}</div>
                                                                 </div>
                                                             </div>
                                                         </td>
-                                                        {[GRADES.G3, GRADES.G4, GRADES.G5, GRADES.DC, GRADES.MASTER].map(grade => (
+                                                        {[GRADES.G3, GRADES.G4, GRADES.G5, GRADES.SPECIAL, GRADES.MASTER].map(grade => (
                                                             <td key={grade} className="px-6 py-4 text-center">
                                                                 <input
                                                                     type="number"
-                                                                    className={`w-14 text-center bg-white border border-slate-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500/20 font-black ${grade === GRADES.G3 ? 'text-blue-600 border-blue-100' : grade === GRADES.G5 ? 'text-yellow-600 border-yellow-100' : grade === GRADES.DC ? 'text-green-600 border-green-100' : grade === GRADES.MASTER ? 'text-purple-600 border-purple-100' : ''}`}
-                                                                    value={discountService.getPatternDiscount(p.brand, p.pattern, p.model, grade)}
-                                                                    onChange={(e) => handleDiscountUpdate(p.brand, p.pattern, p.model, grade, e.target.value)}
+                                                                    className={`w-14 text-center bg-white border border-slate-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500/20 font-black ${grade === GRADES.G3 ? 'text-blue-600 border-blue-100' : grade === GRADES.G5 ? 'text-yellow-600 border-yellow-100' : grade === GRADES.SPECIAL ? 'text-green-600 border-green-100' : grade === GRADES.MASTER ? 'text-purple-600 border-purple-100' : ''}`}
+                                                                    value={discountService.getDiscount(p.code, p.brand, googleSheetService.getDerivedPattern(p), p.model, grade)}
+                                                                    onFocus={(e) => e.target.value === '0' && (e.target.value = '')}
+                                                                    onBlur={(e) => e.target.value === '' && (e.target.value = '0')}
+                                                                    onChange={(e) => handleCodeDiscountUpdate(p.code, grade, e.target.value)}
                                                                 />
                                                             </td>
                                                         ))}
-                                                        <td className="px-4 py-4">
-                                                            <button
-                                                                onClick={() => {
-                                                                    const rate = prompt(`[${p.pattern} ${p.model}] 모든 등급에 적용할 할인율(%)을 입력하세요:`, '0');
-                                                                    if (rate !== null) {
-                                                                        [GRADES.G3, GRADES.G4, GRADES.G5, GRADES.DC, GRADES.MASTER].forEach(g => {
-                                                                            discountService.setPatternDiscount(p.brand, p.pattern, p.model, g, rate);
-                                                                        });
-                                                                        setDiscounts({ ...discountService.getAllDiscounts() });
-                                                                    }
-                                                                }}
-                                                                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-900 transition-colors"
-                                                                title="모든 등급에 동일 적용"
-                                                            >
-                                                                <Zap size={14} />
-                                                            </button>
-                                                        </td>
                                                     </tr>
-                                                ))}
+                                                ));
+                                            })()}
                                         </tbody>
                                     </table>
-                                )}
-
-                                {/* Individual Size Settings Section */}
-                                <div className="mt-8 px-6 pt-8 border-t border-slate-100">
-                                    <div className="flex items-center justify-between mb-6">
-                                        <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
-                                            사이즈별 개별 설정
-                                            <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">{allSizes.length}</span>
-                                        </h3>
-                                        <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                            <input
-                                                type="text"
-                                                placeholder="사이즈 검색 (예: 2454518)"
-                                                className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 w-56"
-                                                value={sizeSearch}
-                                                onChange={(e) => setSizeSearch(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
-                                        <table className="w-full text-left text-xs">
-                                            <thead className="bg-slate-50 text-slate-400 font-black uppercase tracking-widest border-b border-slate-100">
-                                                <tr>
-                                                    <th className="px-6 py-4">타이어 규격</th>
-                                                    <th className="px-6 py-4 text-center text-blue-600">3 (%)</th>
-                                                    <th className="px-6 py-4 text-center text-slate-600">4 (%)</th>
-                                                    <th className="px-6 py-4 text-center text-yellow-600">5 (%)</th>
-                                                    <th className="px-6 py-4 text-center text-green-600">DC (%)</th>
-                                                    <th className="px-6 py-4 text-center text-purple-600">MASTER (%)</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-50 text-slate-600 font-bold">
-                                                {allSizes
-                                                    .filter(s => s.replace(/[^0-9]/g, '').includes(sizeSearch.replace(/[^0-9]/g, '')))
-                                                    .slice(0, 100)
-                                                    .map(size => (
-                                                        <tr key={size} className="hover:bg-slate-50/50 transition-colors">
-                                                            <td className="px-6 py-4">
-                                                                <div className="font-black text-slate-900 text-sm">{size}</div>
-                                                            </td>
-                                                            {[GRADES.G3, GRADES.G4, GRADES.G5, GRADES.DC, GRADES.MASTER].map(grade => (
-                                                                <td key={grade} className="px-6 py-4 text-center">
-                                                                    <input
-                                                                        type="number"
-                                                                        className={`w-14 text-center bg-white border border-slate-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500/20 font-black ${grade === GRADES.G3 ? 'text-blue-600' : grade === GRADES.G5 ? 'text-yellow-600' : grade === GRADES.DC ? 'text-green-600' : grade === GRADES.MASTER ? 'text-purple-600' : ''}`}
-                                                                        value={discountService.getSizeDiscount(size.replace(/\D/g, ''), grade)}
-                                                                        onChange={(e) => handleSizeUpdate(size.replace(/\D/g, ''), grade, e.target.value)}
-                                                                    />
-                                                                </td>
-                                                            ))}
-                                                        </tr>
-                                                    ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                                {(!isLoadingMaster && masterProducts.length === 0) && (
-                                    <div className="p-20 text-center text-slate-400">
-                                        <Tag size={48} className="mx-auto mb-4 opacity-10" />
-                                        <p className="font-black text-slate-500">제품 카탈로그를 불러올 수 없습니다.</p>
-                                    </div>
                                 )}
                             </div>
                         </div>

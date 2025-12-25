@@ -113,5 +113,21 @@ export const googleSheetService = {
             if (cachedSheetData) return Promise.resolve(cachedSheetData);
             return [];
         }
+    },
+
+    getDerivedPattern: (row) => {
+        if (!row) return 'Unknown';
+
+        const isSizeLike = (word) => {
+            return word.includes('/') || /^\d{7}$/.test(word) || /^[0-9]+R[0-9]+$/.test(word) || /\d+인치/.test(word);
+        };
+
+        const words = (row.model || '').trim().split(/\s+/);
+        // Filter out size-like components to get a cleaner pattern name
+        const modelWords = words.filter(w => !isSizeLike(w));
+
+        // Strict 2-word grouping as requested: prioritize model-based derivation
+        if (modelWords.length >= 2) return `${modelWords[0]} ${modelWords[1]}`;
+        return modelWords[0] || 'Unknown';
     }
 };

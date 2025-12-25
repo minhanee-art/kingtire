@@ -73,13 +73,6 @@ const Login = ({ onLoginSuccess, onSwitchToSignup }) => {
                 </div>
             </form>
 
-            <div className="mt-8 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2">Demo Admin account</p>
-                <div className="flex justify-between text-xs font-mono text-slate-500">
-                    <span>ID: admin@kingtire.com</span>
-                    <span>PW: admin</span>
-                </div>
-            </div>
         </div>
     );
 };

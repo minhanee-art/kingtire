@@ -19,6 +19,8 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
     const [showShareModal, setShowShareModal] = useState(false);
     const [expandedDotItems, setExpandedDotItems] = useState([]); // Track expanded DOT lists on mobile
     const [manualDiscounts, setManualDiscounts] = useState({}); // { productCode: rate }
+    const [manualMargins, setManualMargins] = useState({}); // { productCode: margin }
+    const [manualPrices, setManualPrices] = useState({}); // { productCode: price }
 
     // Feature States
     const [selectedDetailProduct, setSelectedDetailProduct] = useState(null);
@@ -84,11 +86,13 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
     // Sync discountRate when store mode toggles
     useEffect(() => {
         if (products.length > 0) {
-            const updated = products.map(p => ({
+            // We no longer swap between official and manual here. 
+            // discountRate is now always the base for Search Mode.
+            // But we might want to ensure manual overrides persist.
+            setProducts(prev => prev.map(p => ({
                 ...p,
-                discountRate: isStoreMode ? (p.officialDiscount || 0) : (manualDiscounts[p.internalCode] || 0)
-            }));
-            setProducts(updated);
+                discountRate: manualDiscounts[p.internalCode] !== undefined ? manualDiscounts[p.internalCode] : (p.officialDiscount || 0)
+            })));
         }
     }, [isStoreMode]);
 
@@ -136,7 +140,7 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                 const shopMatch = findInventoryMatch(s.code);
 
                 // Calculate pattern-based discount (Brand + Pattern + Model)
-                const gradeDiscount = discountService.getDiscount(s.code, s.brand, s.pattern, s.model, user?.grade || '3');
+                const gradeDiscount = discountService.getDiscount(s.code, s.brand, googleSheetService.getDerivedPattern(s), s.model, user?.grade || '3');
 
                 return {
                     brand: s.brand || (shopMatch?.brand),
@@ -148,7 +152,7 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                     totalStock: shopMatch ? shopMatch.totalStock : 0,
                     supplyPrice: shopMatch ? shopMatch.supplyPrice : 0,
                     officialDiscount: gradeDiscount,
-                    discountRate: isStoreMode ? gradeDiscount : (manualDiscounts[s.code] || 0),
+                    discountRate: manualDiscounts[s.code] !== undefined ? manualDiscounts[s.code] : gradeDiscount,
                     internalCode: s.code,
                     itId: shopMatch?.itId, // Ensure itId is passed for the detail modal
                     features: s.features, // Custom features (tags) from Google Sheet
@@ -193,7 +197,7 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
         const newProducts = products.map(p => {
             if (p.internalCode === productToUpdate.internalCode) {
                 let cleanValue = value;
-                if (field === 'discountRate' || field === 'factoryPrice') {
+                if (field === 'discountRate' || field === 'factoryPrice' || field === 'margin') {
                     if (value === '') {
                         cleanValue = '';
                     } else {
@@ -204,6 +208,14 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                 // If we update discountRate manually (Store Mode OFF), save it
                 if (field === 'discountRate' && !isStoreMode) {
                     setManualDiscounts(prev => ({ ...prev, [p.internalCode]: cleanValue }));
+                }
+                // Save margin
+                if (field === 'margin') {
+                    setManualMargins(prev => ({ ...prev, [p.internalCode]: cleanValue }));
+                }
+                // Save manual price override
+                if (field === 'manualPrice') {
+                    setManualPrices(prev => ({ ...prev, [p.internalCode]: cleanValue }));
                 }
                 return updatedProduct;
             }
@@ -227,7 +239,28 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
     const calculateFinalPrice = (product) => {
         const factoryPrice = product.factoryPrice ?? 0;
         const discountRate = product.discountRate || 0;
-        return Math.floor(factoryPrice * (1 - discountRate / 100));
+        const margin = manualMargins[product.internalCode] || 0;
+        const priceOverride = manualPrices[product.internalCode];
+
+        let supplyPrice = Math.floor(factoryPrice * (1 - discountRate / 100));
+
+        // Rule: Grade 3 rounding up at 100s for supply price
+        if (user?.grade === '3') {
+            supplyPrice = Math.ceil(supplyPrice / 1000) * 1000;
+        }
+
+        // In Shop/Consultation mode
+        if (isStoreMode) {
+            // Priority 1: Manual Price Override
+            if (priceOverride !== undefined && priceOverride !== '' && !isNaN(priceOverride)) {
+                return Number(priceOverride);
+            }
+            // Priority 2: Supply + Margin (with rounding up at 100s unit as requested)
+            const marginPrice = supplyPrice + Number(margin);
+            return Math.ceil(marginPrice / 1000) * 1000;
+        }
+
+        return supplyPrice;
     };
 
     /**
@@ -431,14 +464,43 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
 
         cartItems.forEach((item, idx) => {
             const p = item.product;
-            const disc = item.discountRate ?? p.discountRate ?? 0;
-            const finalPrice = Math.floor((p.factoryPrice || 0) * (1 - disc / 100));
-            const subtotal = finalPrice * item.qty;
+            const factoryPrice = p.factoryPrice || 0;
+            const discountRate = item.discountRate ?? p.discountRate ?? 0;
+            const margin = manualMargins[p.internalCode] || 0;
+            const priceOverride = manualPrices[p.internalCode];
+
+            let supplyPrice = Math.floor(factoryPrice * (1 - discountRate / 100));
+            // Rule: Grade 3 rounding up at 100s for supply price
+            if (user?.grade === '3') {
+                supplyPrice = Math.ceil(supplyPrice / 1000) * 1000;
+            }
+
+            let unitPrice;
+            let isManual = false;
+
+            // Priority 1: Manual Price Override
+            if (priceOverride !== undefined && priceOverride !== '' && !isNaN(priceOverride)) {
+                unitPrice = Number(priceOverride);
+                isManual = true;
+            } else {
+                // Priority 2: Supply + Margin (with rounding up at 100s unit)
+                const marginPrice = supplyPrice + Number(margin);
+                unitPrice = Math.ceil(marginPrice / 1000) * 1000;
+            }
+
+            const subtotal = unitPrice * item.qty;
             totalSum += subtotal;
 
             text += `${idx + 1}. ${getBrandDisplayName(p.brand)} ${p.model}\n`;
             text += `   규격: ${p.size}\n`;
-            text += `   단가: ${finalPrice.toLocaleString()}원 (할인율: ${disc}%)\n`;
+            text += `   출고가: ${factoryPrice.toLocaleString()}원\n`;
+
+            if (isManual) {
+                text += `   단가: ${unitPrice.toLocaleString()}원\n`;
+            } else {
+                text += `   단가: (${unitPrice.toLocaleString()}원)\n`;
+            }
+
             text += `   수량: ${item.qty}개\n`;
             text += `   소계: ${subtotal.toLocaleString()}원\n\n`;
         });
@@ -591,10 +653,12 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                                 </th>
                                 <th className="px-5 py-4">규격</th>
                                 <th className="px-5 py-4 text-right cursor-pointer group" onClick={() => handleSort('factoryPrice')}>
-                                    <div className="flex items-center justify-end gap-2 text-slate-600">공장도 <SortIcon columnKey="factoryPrice" /></div>
+                                    <div className="flex items-center justify-end gap-2 text-slate-600">{isStoreMode ? '출고가' : '공장도'} <SortIcon columnKey="factoryPrice" /></div>
                                 </th>
-                                <th className="px-5 py-4 text-center">할인(%)</th>
-                                <th className="px-5 py-4 text-right font-black text-slate-400">판매가</th>
+                                <th className="px-5 py-4 text-center">{isStoreMode ? '할인' : '할인(%)'}</th>
+                                <th className="px-5 py-4 text-right font-black text-slate-400">{isStoreMode ? '판매가' : '납품가'}</th>
+                                {!isStoreMode && <th className="px-5 py-4 text-center">마진</th>}
+                                {!isStoreMode && <th className="px-5 py-4 text-center">판매가(직접)</th>}
                                 <th className="px-5 py-4 text-right cursor-pointer group" onClick={() => handleSort('totalStock')}>
                                     <div className="flex items-center justify-end gap-2 text-slate-600">재고 <SortIcon columnKey="totalStock" /></div>
                                 </th>
@@ -605,7 +669,7 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                         <tbody className="divide-y divide-slate-100">
                             {loading ? (
                                 <tr>
-                                    <td colSpan="10" className="py-24 text-center">
+                                    <td colSpan={isStoreMode ? 10 : 11} className="py-24 text-center">
                                         <div className="flex flex-col items-center gap-3">
                                             <div className="w-10 h-10 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin"></div>
                                             <span className="text-slate-500 font-bold">데이터 동기화 중...</span>
@@ -614,7 +678,7 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                                 </tr>
                             ) : filteredProducts.length === 0 ? (
                                 <tr>
-                                    <td colSpan="10" className="py-24 text-center text-slate-500">
+                                    <td colSpan={isStoreMode ? 10 : 11} className="py-24 text-center text-slate-500">
                                         <Search size={48} className="mx-auto mb-4 opacity-10" />
                                         <div className="font-black text-xl mb-1">데이터 없음</div>
                                         <p className="text-sm opacity-50 font-medium">검색어를 다시 확인해주세요.</p>
@@ -657,24 +721,23 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                                             <td className="p-4 font-black text-slate-900 group-hover:scale-105 transition-transform">{p.size}</td>
                                             <td className="px-5 py-4 text-right">
                                                 <div className="flex flex-col items-end">
-                                                    <div className={`${isStoreMode ? 'text-[10px] text-slate-400' : 'text-xs text-blue-600'} font-bold mb-0.5 whitespace-nowrap uppercase tracking-tighter`}>
-                                                        {isStoreMode ? '공장도가' : '소비자가'}
-                                                    </div>
                                                     <input
                                                         type="text"
-                                                        className={`w-28 text-right bg-transparent border-none rounded px-2 py-1 focus:ring-1 focus:ring-blue-500/20 outline-none transition-all font-black ${isStoreMode ? 'text-slate-600 text-xs' : 'text-blue-600 text-lg'}`}
+                                                        className={`w-32 text-right bg-transparent border-none rounded px-2 py-1 focus:ring-1 focus:ring-blue-500/20 outline-none transition-all font-black ${isStoreMode ? 'text-slate-600 text-sm' : 'text-blue-600 text-[22px]'}`}
                                                         value={factoryPrice ? factoryPrice.toLocaleString() : ''}
                                                         onChange={(e) => handlePriceUpdate(p, 'factoryPrice', e.target.value)}
-                                                        readOnly={isStoreMode}
+                                                        readOnly={true}
                                                     />
                                                 </div>
                                             </td>
                                             <td className="p-4">
                                                 <div className="flex flex-col gap-1 items-center" onClick={(e) => e.stopPropagation()}>
                                                     {isStoreMode ? (
-                                                        <div className="flex items-center gap-1.5 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100">
-                                                            <span className="text-xs font-black text-blue-600">{p.officialDiscount}%</span>
-                                                            <Activity size={12} className="text-blue-400" />
+                                                        <div className="flex items-center gap-1.5 bg-red-50 px-2 py-1 rounded-lg border border-red-100">
+                                                            <span className="text-xs font-black text-red-600">
+                                                                {p.factoryPrice > 0 ? Math.round(100 - (calculateFinalPrice(p) / p.factoryPrice * 100)) : 0}%
+                                                            </span>
+                                                            <Activity size={12} className="text-red-400" />
                                                         </div>
                                                     ) : (
                                                         <div className="flex items-center gap-2 group/input">
@@ -692,18 +755,41 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                                             </td>
                                             <td className="p-4">
                                                 <div className="flex flex-col items-center gap-0.5">
-                                                    <span className="text-lg font-black text-slate-900">
+                                                    <span className={`${isStoreMode ? 'text-xl text-red-600' : 'text-lg text-slate-900'} font-black`}>
                                                         {calculateFinalPrice(p).toLocaleString()}
                                                         <span className="text-xs ml-0.5">원</span>
                                                     </span>
-                                                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-tighter">판매가</span>
                                                 </div>
                                             </td>
+                                            {!isStoreMode && (
+                                                <td className="p-4" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="flex flex-col gap-2">
+                                                        <div className="flex items-center justify-center">
+                                                            <input
+                                                                type="text"
+                                                                className="w-20 text-center bg-white border-2 border-slate-100 rounded-lg py-1 text-sm font-black focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all"
+                                                                placeholder="마진"
+                                                                value={manualMargins[p.internalCode] || ''}
+                                                                onChange={(e) => handlePriceUpdate(p, 'margin', e.target.value)}
+                                                            />
+                                                        </div>
+                                                        <div className="flex items-center justify-center">
+                                                            <input
+                                                                type="text"
+                                                                className="w-24 text-center bg-white border-2 border-slate-100 rounded-lg py-1 text-sm font-black focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all text-blue-600"
+                                                                placeholder="판매가 직접"
+                                                                value={manualPrices[p.internalCode] || ''}
+                                                                onChange={(e) => handlePriceUpdate(p, 'manualPrice', e.target.value)}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            )}
                                             <td className="p-4">
                                                 <div className="flex flex-col items-center gap-1.5">
-                                                    <div className="flex items-center gap-1.5 bg-slate-900 text-white px-3 py-1 rounded-full shadow-sm">
+                                                    <div className="flex items-center gap-1.5 bg-[#004F9F] text-white px-3 py-1 rounded-full shadow-sm">
                                                         <span className="text-xs font-black italic">{p.totalStock}</span>
-                                                        <div className="w-1 h-1 rounded-full bg-blue-500 animate-pulse"></div>
+                                                        <div className="w-1 h-1 rounded-full bg-blue-400 animate-pulse"></div>
                                                     </div>
                                                 </div>
                                             </td>
@@ -768,9 +854,9 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                             const selected = isSelected(p);
 
                             return (
-                                <div key={p.internalCode || idx} className={`relative p-5 rounded-2xl border transition-premium overflow-hidden ${selected ? 'bg-blue-50 border-blue-200 shadow-md shadow-blue-500/10' : 'bg-white border-slate-200 shadow-sm'}`}>
+                                <div key={p.internalCode || idx} className={`relative p-5 rounded-2xl border transition-premium overflow-hidden ${selected ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 shadow-md shadow-blue-500/10' : 'bg-white dark:bg-slate-900/50 border-slate-200 dark:border-white/5 shadow-sm'}`}>
                                     {/* Selection Glow */}
-                                    {selected && <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-[60px] pointer-events-none"></div>}
+                                    {selected && <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 blur-[60px] pointer-events-none"></div>}
 
                                     <div className="flex justify-between items-start mb-4 relative z-10">
                                         <div className="flex-1 flex gap-4">
@@ -835,11 +921,10 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                                         <div className="flex items-center justify-between">
                                             <div className="text-[11px] font-bold text-slate-400">
                                                 {isStoreMode ? (
-                                                    <span className="bg-red-50 text-red-500 px-2 py-0.5 rounded-full text-[10px] font-black">소매점 할인가</span>
+                                                    <span className="bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400 px-2 py-0.5 rounded-full text-[10px] font-black border border-transparent dark:border-red-400/20">출고가 할인가</span>
                                                 ) : (
                                                     <div className="flex flex-col">
-                                                        <span className="text-[13px] text-blue-600 font-black mb-1">소비자가</span>
-                                                        <span className="text-2xl font-black text-slate-900 tracking-tighter">{factoryPrice.toLocaleString()}<span className="text-sm ml-0.5">원</span></span>
+                                                        <span className="text-3xl font-black text-blue-600 dark:text-blue-400 tracking-tighter">{factoryPrice.toLocaleString()}<span className="text-sm ml-0.5">원</span></span>
                                                     </div>
                                                 )}
                                             </div>
@@ -851,26 +936,49 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                                                 )}
                                                 <div className="flex items-baseline gap-2">
                                                     {isStoreMode && (
-                                                        <span className="text-2xl font-black text-red-600 italic">{discountRate}%</span>
+                                                        <span className="text-2xl font-black text-red-600 dark:text-red-400 italic">
+                                                            {p.factoryPrice > 0 ? Math.round(100 - (calculateFinalPrice(p) / p.factoryPrice * 100)) : 0}%
+                                                        </span>
                                                     )}
-                                                    <span className="text-3xl font-black text-slate-900 tracking-tighter">
-                                                        {discountedPrice.toLocaleString()}
-                                                        <span className="text-sm ml-1 font-bold text-slate-500">원</span>
+                                                    <span className={`${isStoreMode ? 'text-3xl text-red-600 dark:text-red-400' : 'text-2xl text-slate-900 dark:text-white'} font-black tracking-tighter`}>
+                                                        {calculateFinalPrice(p).toLocaleString()}
+                                                        <span className="text-sm ml-1 font-bold text-slate-500 dark:text-slate-400">원</span>
                                                     </span>
                                                 </div>
                                             </div>
 
-                                            <div className={`w-20 flex items-center border rounded-lg h-9 px-2 transition-all ${isStoreMode ? 'bg-slate-50 border-slate-200' : 'bg-white border-blue-500/30 ring-2 ring-blue-500/5'}`}>
-                                                <input
-                                                    type="text"
-                                                    value={p.discountRate === 0 ? '' : p.discountRate}
-                                                    onFocus={(e) => e.target.select()}
-                                                    onChange={(e) => handlePriceUpdate(p, 'discountRate', e.target.value.replace(/[^0-9]/g, ''))}
-                                                    className={`w-full text-center text-xs font-black outline-none bg-transparent ${isStoreMode ? 'text-slate-400' : 'text-blue-600'}`}
-                                                    readOnly={isStoreMode}
-                                                />
-                                                <span className="text-[10px] font-black text-slate-400 pr-1">%</span>
-                                            </div>
+                                            {!isStoreMode && (
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="w-24 flex items-center border-2 border-slate-100 rounded-lg h-9 px-2 transition-all bg-white focus-within:border-blue-500">
+                                                        <input
+                                                            type="text"
+                                                            value={p.discountRate === 0 ? '' : p.discountRate}
+                                                            onFocus={(e) => e.target.select()}
+                                                            onChange={(e) => handleManualDiscountChange(p.internalCode, e.target.value)}
+                                                            className="w-full text-center text-[11px] font-black outline-none bg-transparent text-blue-600"
+                                                        />
+                                                        <span className="text-[10px] font-black text-slate-400 pl-0.5">%</span>
+                                                    </div>
+                                                    <div className="w-24 flex items-center border-2 border-slate-100 rounded-lg h-9 px-2 transition-all bg-white focus-within:border-blue-500">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="마진"
+                                                            value={manualMargins[p.internalCode] || ''}
+                                                            onChange={(e) => handlePriceUpdate(p, 'margin', e.target.value)}
+                                                            className="w-full text-center text-[11px] font-black outline-none bg-transparent text-slate-900"
+                                                        />
+                                                    </div>
+                                                    <div className="w-24 flex items-center border-2 border-slate-100 rounded-lg h-9 px-2 transition-all bg-white focus-within:border-blue-500">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="판매가 직접"
+                                                            value={manualPrices[p.internalCode] || ''}
+                                                            onChange={(e) => handlePriceUpdate(p, 'manualPrice', e.target.value)}
+                                                            className="w-full text-center text-[11px] font-black outline-none bg-transparent text-blue-600"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
@@ -931,10 +1039,10 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
             {/* Premium Share Modal */}
             {showShareModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[2.5rem] w-full max-w-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
-                        <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-white">
+                    <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
+                        <div className="p-8 border-b border-slate-100 dark:border-white/5 flex items-center justify-between bg-white dark:bg-slate-900">
                             <div>
-                                <h3 className="text-2xl font-black text-slate-900">견적서</h3>
+                                <h3 className="text-2xl font-black text-slate-900 dark:text-white">견적서</h3>
                             </div>
                             <button
                                 onClick={() => setShowShareModal(false)}
@@ -1011,12 +1119,12 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
 
                             <hr className="border-slate-100" />
 
-                            <div className="p-6 bg-slate-900 rounded-3xl border-2 border-slate-800 overflow-hidden relative group">
+                            <div className="p-6 bg-slate-50 rounded-3xl border border-slate-200 overflow-hidden relative group">
                                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                    <Share2 size={80} className="text-white" />
+                                    <Share2 size={80} className="text-blue-600" />
                                 </div>
-                                <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-4">견적서 미리보기</div>
-                                <pre className="text-xs font-bold text-slate-300 whitespace-pre-wrap leading-relaxed relative z-10 font-mono">
+                                <div className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-4">견적서 미리보기</div>
+                                <pre className="text-xs font-bold text-slate-700 whitespace-pre-wrap leading-relaxed relative z-10 font-mono">
                                     {generateShareQuoteText()}
                                 </pre>
                             </div>
@@ -1024,7 +1132,7 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                             <div className="flex flex-col gap-3">
                                 <button
                                     onClick={handleCopyFullText}
-                                    className="w-full flex items-center justify-center gap-3 py-4 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-2xl transition-all active:scale-[0.98] shadow-lg shadow-slate-900/10"
+                                    className="w-full flex items-center justify-center gap-3 py-4 bg-[#004F9F] hover:bg-[#003d7a] text-white font-black rounded-2xl transition-all active:scale-[0.98] shadow-lg shadow-blue-900/10"
                                 >
                                     <Copy size={20} />
                                     전체 내역 복사하기

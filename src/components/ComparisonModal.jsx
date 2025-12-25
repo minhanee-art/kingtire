@@ -12,7 +12,7 @@ const ComparisonModal = ({ selectedItems, onClose }) => {
     ];
 
     return (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-400/30 backdrop-blur-md animate-in fade-in duration-300">
             <div className="bg-white rounded-[2.5rem] w-full max-w-6xl max-h-[95vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
                 {/* Header */}
                 <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
@@ -68,23 +68,23 @@ const ComparisonModal = ({ selectedItems, onClose }) => {
                                             <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 font-bold">?</div>
                                         )}
                                     </div>
-                                    <h4 className="text-sm font-black text-slate-900 truncate w-full px-2">{item.model}</h4>
+                                    <h4 className="text-sm font-black text-slate-900 dark:text-white truncate w-full px-2">{item.model}</h4>
                                 </div>
 
                                 {/* Brand & ID */}
-                                <div className="h-20 flex flex-col justify-center border-t border-slate-100/50">
-                                    <span className="text-[10px] font-black text-blue-600 uppercase mb-1">{item.brand}</span>
-                                    <span className="text-[11px] font-mono font-bold text-slate-500">{item.partNo}</span>
+                                <div className="h-20 flex flex-col justify-center border-t border-slate-100/50 dark:border-white/5">
+                                    <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase mb-1">{item.brand}</span>
+                                    <span className="text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400">{item.partNo}</span>
                                 </div>
 
                                 {/* Size */}
-                                <div className="h-10 flex items-center font-bold text-sm text-slate-700 border-t border-slate-100/50">
+                                <div className="h-10 flex items-center font-bold text-sm text-slate-700 dark:text-slate-300 border-t border-slate-100/50 dark:border-white/5">
                                     {item.size}
                                 </div>
 
                                 {/* Stock */}
-                                <div className="h-10 flex items-center border-t border-slate-100/50">
-                                    <span className={`px-3 py-1 rounded-full text-[11px] font-black uppercase ${item.totalStock > 0 ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                                <div className="h-10 flex items-center border-t border-slate-100/50 dark:border-white/5">
+                                    <span className={`px-3 py-1 rounded-full text-[11px] font-black uppercase ${item.totalStock > 0 ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-500"}`}>
                                         {item.totalStock > 0 ? `재고 있음 (${item.totalStock})` : "품절"}
                                     </span>
                                 </div>
@@ -109,7 +109,7 @@ const ComparisonModal = ({ selectedItems, onClose }) => {
                                 <div className="h-20 flex flex-col justify-end border-t border-slate-100/50">
                                     <div className="text-xl font-black text-slate-900">
                                         {Math.floor(item.factoryPrice * (1 - (item.discountRate || 0) / 100)).toLocaleString()}
-                                        <span className="text-xs ml-1">원</span>
+                                        <span className="text-xs ml-1 text-slate-500 font-bold italic">원</span>
                                     </div>
                                     {item.discountRate > 0 && (
                                         <div className="text-[10px] font-bold text-red-500 uppercase">

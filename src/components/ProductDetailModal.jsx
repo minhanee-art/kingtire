@@ -38,7 +38,7 @@ const ProductDetailModal = ({ product, onClose, isStoreMode }) => {
     if (!product) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-400/30 backdrop-blur-sm animate-in fade-in duration-300">
             <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
                 {/* Header */}
                 <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
@@ -113,7 +113,7 @@ const ProductDetailModal = ({ product, onClose, isStoreMode }) => {
                                     {metrics.map((metric, i) => {
                                         const isMax = metric.value === maxValue && maxValue > 0;
                                         return (
-                                            <div key={i} className={`p-3 bg-white border rounded-lg transition-all duration-500 ${isMax ? "border-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.1)] ring-1 ring-blue-500/20 scale-[1.02]" : "border-slate-100 shadow-sm"
+                                            <div key={i} className={`p-3 border rounded-lg transition-all duration-500 ${isMax ? "bg-blue-600/5 border-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.1)] ring-1 ring-blue-500/20 scale-[1.02]" : "bg-white border-slate-100 shadow-sm"
                                                 }`}>
                                                 <div className="flex items-center justify-between mb-2">
                                                     <span className={`text-[11px] font-bold flex items-center gap-1 ${isMax ? "text-blue-600" : "text-slate-500"}`}>
@@ -190,7 +190,7 @@ const ProductDetailModal = ({ product, onClose, isStoreMode }) => {
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">예상 판매가</span>
                         <div className="text-2xl font-black text-slate-900">
                             {Math.floor(product.factoryPrice * (1 - (product.discountRate || 0) / 100)).toLocaleString()}
-                            <span className="text-sm ml-1">원</span>
+                            <span className="text-sm ml-1 text-slate-500 italic">원</span>
                         </div>
                     </div>
                     <button

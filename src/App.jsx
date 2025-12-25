@@ -8,6 +8,9 @@ function App() {
     const [isReady, setIsReady] = useState(false);
     const [view, setView] = useState('login'); // 'login', 'signup', 'main'
     const [user, setUser] = useState(null);
+    useEffect(() => {
+        document.documentElement.classList.remove('dark');
+    }, []);
 
     useEffect(() => {
         const currentUser = authService.getCurrentUser();
