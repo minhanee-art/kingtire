@@ -85,6 +85,8 @@ class AuthService {
 
     async login(email, password) {
         let user;
+        const lastLogin = new Date().toISOString();
+
         if (supabase) {
             const { data, error } = await supabase
                 .from('users')
@@ -95,12 +97,28 @@ class AuthService {
 
             if (error && error.code !== 'PGRST116') throw new Error('로그인 중 오류가 발생했습니다.');
             user = data;
+
+            if (user) {
+                // Background update for lastLogin
+                supabase.from('users').update({ lastLogin }).eq('id', user.id).then(({ error }) => {
+                    if (error) console.error('Failed to update last login:', error);
+                });
+            }
         } else {
             user = this.users.find(u => u.email === email && u.password === password);
         }
 
         if (user) {
+            user.lastLogin = lastLogin;
             this.currentUser = user;
+
+            // Also update the local cached user list
+            const localUserIndex = this.users.findIndex(u => u.id === user.id);
+            if (localUserIndex !== -1) {
+                this.users[localUserIndex] = { ...this.users[localUserIndex], lastLogin };
+            }
+
+            this._saveUsers();
             this._saveSession();
             return user;
         }
