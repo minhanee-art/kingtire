@@ -63,10 +63,7 @@ body {
 }
 
 /* Dark Mode Utilities - Refinement for higher contrast */
-.dark .bg-white {
-  /* Using a slightly lighter slate for cards to separate them from the background */
-  @apply bg-[#161F32] !important;
-}
+
 
 .dark .bg-slate-50 {
   @apply bg-[#0B0F1A] !important;
