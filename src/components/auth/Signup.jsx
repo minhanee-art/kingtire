@@ -3,8 +3,9 @@ import { User, Building2, Phone, FileText, Mail, Lock, Upload, CheckCircle2, Che
 import { authService } from '../../services/AuthService';
 
 const Signup = ({ onSwitchToLogin, onSignupSuccess }) => {
+    const [emailId, setEmailId] = useState('');
+    const [emailDomain, setEmailDomain] = useState('');
     const [formData, setFormData] = useState({
-        email: '',
         password: '',
         company: '',
         ceo: '',
@@ -18,14 +19,49 @@ const Signup = ({ onSwitchToLogin, onSignupSuccess }) => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
+
+        // Numeric validation for contact and business number
+        if (name === 'contact' || name === 'businessNumber') {
+            // Alert if non-numeric character is entered (excluding hyphens)
+            if (/[^0-9-]/.test(value)) {
+                alert('숫자만 입력 가능합니다.');
+                return;
+            }
+
+            const numbersOnly = value.replace(/[^0-9]/g, '');
+            let formattedValue = numbersOnly;
+
+            if (name === 'contact') {
+                formattedValue = formatPhoneNumber(numbersOnly);
+            } else if (name === 'businessNumber') {
+                formattedValue = formatBusinessNumber(numbersOnly);
+            }
+
+            setFormData(prev => ({ ...prev, [name]: formattedValue }));
+            return;
+        }
+
         setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const formatPhoneNumber = (val) => {
+        if (!val) return '';
+        if (val.length <= 3) return val;
+        if (val.length <= 7) return `${val.slice(0, 3)}-${val.slice(3)}`;
+        return `${val.slice(0, 3)}-${val.slice(3, 7)}-${val.slice(7, 11)}`;
+    };
+
+    const formatBusinessNumber = (val) => {
+        if (!val) return '';
+        if (val.length <= 3) return val;
+        if (val.length <= 5) return `${val.slice(0, 3)}-${val.slice(3)}`;
+        return `${val.slice(0, 3)}-${val.slice(3, 5)}-${val.slice(5, 10)}`;
     };
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (file) {
             setFormData(prev => ({ ...prev, licenseImage: file.name }));
-            // In a real app, we'd upload the file. For now, we'll just show a preview URL if it's an image.
             const reader = new FileReader();
             reader.onloadend = () => {
                 setPreview(reader.result);
@@ -37,7 +73,8 @@ const Signup = ({ onSwitchToLogin, onSignupSuccess }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            await authService.signup(formData);
+            const fullEmail = `${emailId}@${emailDomain}`;
+            await authService.signup({ ...formData, email: fullEmail });
             setIsSuccess(true);
             setTimeout(() => {
                 if (onSignupSuccess) onSignupSuccess();
@@ -68,20 +105,60 @@ const Signup = ({ onSwitchToLogin, onSignupSuccess }) => {
 
             <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Auth Info */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 gap-6">
                     <div className="space-y-2">
                         <label className="text-xs font-black text-slate-500 uppercase ml-1">이메일 주소(계산서용)</label>
-                        <div className="relative">
-                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                            <input
-                                required
-                                name="email"
-                                type="email"
-                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                                placeholder="name@company.com"
-                                value={formData.email}
-                                onChange={handleChange}
-                            />
+                        <div className="flex flex-col md:flex-row md:items-center gap-2 group">
+                            <div className="relative flex-1">
+                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={16} />
+                                <input
+                                    required
+                                    className="w-full pl-10 pr-2 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold"
+                                    placeholder="아이디"
+                                    value={emailId}
+                                    onChange={(e) => setEmailId(e.target.value)}
+                                />
+                            </div>
+                            <span className="hidden md:block text-slate-400 font-bold text-lg">@</span>
+                            <div className="flex-[1.5] flex gap-2">
+                                <div className="relative flex-1">
+                                    <select
+                                        className="w-full pl-4 pr-10 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold appearance-none cursor-pointer"
+                                        value={['naver.com', 'gmail.com', 'hanmail.net', 'daum.net', 'kakao.com', 'icloud.com'].includes(emailDomain) ? emailDomain : (emailDomain === '' ? '' : 'custom')}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val === 'custom') {
+                                                setEmailDomain(' '); // Use a space to trigger custom input display
+                                            } else {
+                                                setEmailDomain(val);
+                                            }
+                                        }}
+                                    >
+                                        <option value="">-선택-</option>
+                                        <option value="naver.com">naver.com</option>
+                                        <option value="gmail.com">gmail.com</option>
+                                        <option value="hanmail.net">hanmail.net</option>
+                                        <option value="daum.net">daum.net</option>
+                                        <option value="kakao.com">kakao.com</option>
+                                        <option value="icloud.com">icloud.com</option>
+                                        <option value="custom">직접입력</option>
+                                    </select>
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+                                    </div>
+                                </div>
+                                {(!['naver.com', 'gmail.com', 'hanmail.net', 'daum.net', 'kakao.com', 'icloud.com', ''].includes(emailDomain)) && (
+                                    <div className="relative flex-1 animate-in slide-in-from-right-2 duration-300">
+                                        <input
+                                            required
+                                            className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold"
+                                            placeholder="주소 입력"
+                                            value={emailDomain === ' ' ? '' : emailDomain}
+                                            onChange={(e) => setEmailDomain(e.target.value)}
+                                        />
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                     <div className="space-y-2">
@@ -126,7 +203,7 @@ const Signup = ({ onSwitchToLogin, onSignupSuccess }) => {
                             <input
                                 required
                                 name="ceo"
-                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold"
                                 placeholder="홍길동"
                                 value={formData.ceo}
                                 onChange={handleChange}
@@ -143,7 +220,8 @@ const Signup = ({ onSwitchToLogin, onSignupSuccess }) => {
                             <input
                                 required
                                 name="contact"
-                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                maxLength={13}
+                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold"
                                 placeholder="010-0000-0000"
                                 value={formData.contact}
                                 onChange={handleChange}
@@ -157,7 +235,8 @@ const Signup = ({ onSwitchToLogin, onSignupSuccess }) => {
                             <input
                                 required
                                 name="businessNumber"
-                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                maxLength={12}
+                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold"
                                 placeholder="000-00-00000"
                                 value={formData.businessNumber}
                                 onChange={handleChange}
