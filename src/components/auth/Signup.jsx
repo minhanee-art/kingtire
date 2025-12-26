@@ -80,7 +80,12 @@ const Signup = ({ onSwitchToLogin, onSignupSuccess }) => {
                 if (onSignupSuccess) onSignupSuccess();
             }, 2000);
         } catch (error) {
-            alert(error.message);
+            // Handle duplicate email error from Supabase (code 23505)
+            if (error.code === '23505' || error.message?.includes('duplicate key value')) {
+                alert('이미 사용중인 이메일 입니다.');
+            } else {
+                alert(error.message || '회원가입 중 오류가 발생했습니다.');
+            }
         }
     };
 
@@ -189,7 +194,8 @@ const Signup = ({ onSwitchToLogin, onSignupSuccess }) => {
                             <input
                                 required
                                 name="company"
-                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                style={{ imeMode: 'active' }}
+                                className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold"
                                 placeholder="(주)대동타이어"
                                 value={formData.company}
                                 onChange={handleChange}
@@ -203,6 +209,7 @@ const Signup = ({ onSwitchToLogin, onSignupSuccess }) => {
                             <input
                                 required
                                 name="ceo"
+                                style={{ imeMode: 'active' }}
                                 className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold"
                                 placeholder="홍길동"
                                 value={formData.ceo}
@@ -251,6 +258,7 @@ const Signup = ({ onSwitchToLogin, onSignupSuccess }) => {
                         <CheckSquare className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input
                             name="bankAccount"
+                            style={{ imeMode: 'active' }}
                             className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-bold"
                             placeholder="예: 기업은행 15207812304017 (주)대동휠앤타이어"
                             value={formData.bankAccount}
