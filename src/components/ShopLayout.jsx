@@ -29,7 +29,7 @@ const ShopLayout = ({ user, onLogout, onSetView, currentView, isStoreMode, onTog
                             </div>
                             <h1 className="text-xl font-black text-white tracking-tighter flex items-baseline gap-1">
                                 왕타이어
-                                <span className={`w-1.5 h-1.5 rounded-full transition-colors ${isStoreMode ? 'bg-blue-400' : 'bg-white/30'}`}></span>
+                                <span className={`w-2 h-2 rounded-full transition-all duration-500 ${isStoreMode ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)] animate-pulse' : 'bg-white/20'}`}></span>
                             </h1>
                         </div>
 

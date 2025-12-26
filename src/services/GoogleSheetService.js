@@ -102,7 +102,7 @@ export const googleSheetService = {
 
                         // Update Cache
                         cachedSheetData = parsedData;
-                        lastFetchTime = Date.now();
+                        lastFetchTime = now;
 
                         // Build Size Index (References to existing objects to save memory)
                         const newSizeIndex = new Map();
