@@ -6,6 +6,8 @@ dist
 !index.html
 *.csv
 !sheet_data.csv
+!251225_all_code.csv
+!public/251225_all_code.csv
 *.txt
 !cookies.txt
 .DS_Store
