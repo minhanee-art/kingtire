@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Tag, Settings, CheckCircle2, XCircle, ChevronRight, Search, BarChart3, Zap, Save } from 'lucide-react';
+import Papa from 'papaparse';
+import { Users, Tag, Settings, CheckCircle2, XCircle, ChevronRight, Search, BarChart3, Zap, Save, Upload } from 'lucide-react';
 import { authService, GRADES, discountService } from '../../services/AuthService';
 import { googleSheetService } from '../../services/GoogleSheetService';
 
@@ -188,6 +189,30 @@ const AdminPanel = ({ products }) => {
             window.Kakao.init('042049fba44b2af969fb7c7fbc7b6176');
         }
     }, []);
+
+    const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: async (results) => {
+                if (results.data && results.data.length > 0) {
+                    const count = await discountService.bulkUpdateDiscounts(results.data);
+                    setDiscounts({ ...discountService.getAllDiscounts() }); // Trigger re-render
+                    alert(`${count}개의 제품 코드가 업데이트 되었습니다.`);
+                } else {
+                    alert('유효한 데이터가 없습니다.');
+                }
+                e.target.value = null; // Reset input
+            },
+            error: (err) => {
+                console.error('CSV Parse Error:', err);
+                alert('파일을 읽는 중 오류가 발생했습니다.');
+            }
+        });
+    };
 
     const filteredUsers = users.filter(u => {
         const company = (u.company || '').toLowerCase();
@@ -406,6 +431,25 @@ const AdminPanel = ({ products }) => {
                                     <Zap className="text-blue-600" size={20} />
                                     <h4 className="font-black text-slate-900">브랜드별 일괄 할인 설정</h4>
                                 </div>
+
+                                <div className="mb-6 p-4 bg-white border border-slate-200 rounded-xl">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h5 className="text-xs font-black text-slate-700 flex items-center gap-2">
+                                            <Upload size={14} className="text-green-600" /> 엑셀(CSV) 일괄 업로드
+                                        </h5>
+                                        <a href="/public/251225_all_code.csv" download className="text-[10px] text-blue-500 underline hover:text-blue-700">샘플(현재파일) 다운로드</a>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mb-3">
+                                        * code, price3, price4, price5, Special 컬럼이 포함된 CSV 파일을 업로드하세요.
+                                    </p>
+                                    <input
+                                        type="file"
+                                        accept=".csv"
+                                        onChange={handleFileUpload}
+                                        className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                                    />
+                                </div>
+
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                                     <div className="space-y-1">
                                         <label className="text-[10px] text-slate-500 font-bold uppercase">대상 브랜드</label>

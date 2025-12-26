@@ -415,6 +415,32 @@ class DiscountService {
     getAllDiscounts() {
         return this.discounts;
     }
+
+    async bulkUpdateDiscounts(parsedData) {
+        let count = 0;
+        parsedData.forEach(row => {
+            const code = (row['code'] || '').trim();
+            if (code) {
+                // Determine values based on row keys, handling undefined/null
+                const p3 = row['price3'] !== undefined ? row['price3'] : '';
+                const p4 = row['price4'] !== undefined ? row['price4'] : '';
+                const p5 = row['price5'] !== undefined ? row['price5'] : '';
+                const sp = row['Special'] !== undefined ? row['Special'] : '';
+
+                if (p3 !== '' || p4 !== '' || p5 !== '' || sp !== '') {
+                    this.csvRates.set(code, {
+                        price3: p3,
+                        price4: p4,
+                        price5: p5,
+                        Special: sp
+                    });
+                    count++;
+                }
+            }
+        });
+        console.log(`[DiscountService] Bulk updated ${count} codes.`);
+        return count;
+    }
 }
 
 export const authService = new AuthService();
