@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import Papa from 'papaparse';
 
 // Simple local ID generator
 const generateId = () => Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
@@ -235,8 +236,50 @@ class AuthService {
 class DiscountService {
     constructor() {
         this.discounts = JSON.parse(localStorage.getItem(DISCOUNTS_KEY)) || {};
+        this.csvRates = new Map(); // Store CSV based rates
+        this.isCsvLoaded = false;
+
         if (supabase) {
             this.syncFromSupabase();
+        }
+        // Immediately try to load CSV
+        this.loadCsvData();
+    }
+
+    async loadCsvData() {
+        if (this.isCsvLoaded) return;
+
+        try {
+            console.log('Fetching Discount CSV data...');
+            const response = await fetch('/251225_all_code.csv');
+            if (!response.ok) throw new Error('Failed to fetch CSV');
+            const csvText = await response.text();
+
+            // Simple parser if Papa isn't available or just use Papa
+            Papa.parse(csvText, {
+                header: true,
+                skipEmptyLines: true,
+                complete: (results) => {
+                    if (results.data) {
+                        results.data.forEach(row => {
+                            // Normalize keys
+                            const code = (row['code'] || '').trim();
+                            if (code) {
+                                this.csvRates.set(code, {
+                                    price3: row['price3'],
+                                    price4: row['price4'],
+                                    price5: row['price5'],
+                                    Special: row['Special']
+                                });
+                            }
+                        });
+                        this.isCsvLoaded = true;
+                        console.log(`[DiscountService] Loaded ${this.csvRates.size} discount rules from CSV.`);
+                    }
+                }
+            });
+        } catch (e) {
+            console.error('Failed to load discount CSV:', e);
         }
     }
 
@@ -313,6 +356,39 @@ class DiscountService {
     }
 
     getDiscount(productCode, brand, pattern, model, grade, sizeStr = '') {
+        // 1. Check CSV Rates first (User Request Priority)
+        if (this.isCsvLoaded && this.csvRates.has(productCode)) {
+            const rates = this.csvRates.get(productCode);
+            let rate = 0;
+
+            // Mapping: price3=3, price4=4, price5=5/MASTER, special=SPECIAL/ADMIN
+            switch (grade) {
+                case GRADES.G3:
+                    rate = rates.price3;
+                    break;
+                case GRADES.G4:
+                    rate = rates.price4;
+                    break;
+                case GRADES.G5:
+                case GRADES.MASTER:
+                    rate = rates.price5;
+                    break;
+                case GRADES.SPECIAL:
+                case GRADES.ADMIN: // Assuming Admin gets Special rate
+                    rate = rates.Special;
+                    break;
+                default:
+                    // For others or pending, maybe 0 or check standard discounts
+                    break;
+            }
+
+            if (rate) {
+                // Ensure we return a number
+                return parseFloat(rate);
+            }
+        }
+
+        // 2. Fallback to existing manual overrides logic
         if (this.discounts[productCode]?.[grade] !== undefined) {
             return this.discounts[productCode][grade];
         }
