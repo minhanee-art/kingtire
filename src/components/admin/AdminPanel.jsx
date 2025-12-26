@@ -33,20 +33,26 @@ const AdminPanel = ({ products }) => {
     }, [selectedPattern, selectedBrand]);
 
     useEffect(() => {
+        let isMounted = true;
         setUsers(authService.getUsers());
         setDiscounts(discountService.getAllDiscounts());
 
         const loadMasterData = async () => {
             if (activeTab === 'discounts' && (masterProducts.length === 0 || masterProducts.length === products?.length)) {
-                setIsLoadingMaster(true);
+                if (isMounted) setIsLoadingMaster(true);
                 try {
                     const data = await googleSheetService.fetchSheetData();
+                    if (!isMounted) return;
+
                     setFullMasterData(data); // Store everything for size filtering
 
                     // Filter by allowed brands AND factoryPrice > 0
                     const filtered = data
                         .filter(d => {
-                            if (d.factoryPrice <= 0 && activeTab !== 'discounts') return false; // allow 0 price in admin if needed, but usually not
+                            // Basic sanity check: must have brand, size, and model
+                            if (!d.brand || !d.size || !d.model) return false;
+
+                            if (d.factoryPrice <= 0 && activeTab !== 'discounts') return false;
                             const b = d.brand?.trim();
                             if (!b) return false;
                             return ALLOWED_BRANDS.some(allowed =>
@@ -85,67 +91,71 @@ const AdminPanel = ({ products }) => {
                 } catch (err) {
                     console.error('Master data load failed', err);
                 } finally {
-                    setIsLoadingMaster(false);
+                    if (isMounted) setIsLoadingMaster(false);
                 }
             }
         };
         loadMasterData();
+
+        return () => {
+            isMounted = false;
+        };
     }, [activeTab]);
 
-    const handleGradeUpdate = (userId, newGrade) => {
-        authService.updateUserGrade(userId, newGrade);
+    const handleGradeUpdate = async (userId, newGrade) => {
+        await authService.updateUserGrade(userId, newGrade);
         setUsers([...authService.getUsers()]);
     };
 
-    const handleDeleteUser = (userId, company) => {
+    const handleDeleteUser = async (userId, company) => {
         if (window.confirm(`[경고] ${company} 업체를 정말로 삭제하시겠습니까?\n이 작업은 되돌릴 수 없으며 해당 업체의 모든 정보가 삭제됩니다.`)) {
-            authService.deleteUser(userId);
+            await authService.deleteUser(userId);
             setUsers([...authService.getUsers()]);
         }
     };
 
-    const handleDiscountUpdate = (brand, pattern, model, grade, rate) => {
-        discountService.setPatternDiscount(brand, pattern, model, grade, rate);
+    const handleDiscountUpdate = async (brand, pattern, model, grade, rate) => {
+        await discountService.setPatternDiscount(brand, pattern, model, grade, rate);
         setDiscounts({ ...discountService.getAllDiscounts() });
     };
 
-    const handleBulkUpdate = () => {
+    const handleBulkUpdate = async () => {
         if (bulkSettings.brand === 'All' && !window.confirm('전체 브랜드에 대해 일괄 설정을 진행하시겠습니까?')) return;
 
         const targets = masterProducts.filter(p => bulkSettings.brand === 'All' || p.brand === bulkSettings.brand);
 
-        targets.forEach(p => {
-            discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.G3, bulkSettings.g3);
-            discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.G4, bulkSettings.g4);
-            discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.G5, bulkSettings.g5);
-            discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.SPECIAL, bulkSettings.special);
-            discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.MASTER, bulkSettings.master);
-        });
+        for (const p of targets) {
+            await discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.G3, bulkSettings.g3);
+            await discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.G4, bulkSettings.g4);
+            await discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.G5, bulkSettings.g5);
+            await discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.SPECIAL, bulkSettings.special);
+            await discountService.setPatternDiscount(p.brand, p.pattern, p.model, GRADES.MASTER, bulkSettings.master);
+        }
 
         setDiscounts({ ...discountService.getAllDiscounts() });
         alert(`${targets.length}개 패턴의 할인율이 일괄 변경되었습니다.`);
     };
 
-    const handleCodeDiscountUpdate = (code, grade, rate) => {
-        discountService.setCodeDiscount(code, grade, rate);
+    const handleCodeDiscountUpdate = async (code, grade, rate) => {
+        await discountService.setCodeDiscount(code, grade, rate);
         setDiscounts({ ...discountService.getAllDiscounts() });
     };
 
-    const applyPatternBulkRate = (rate) => {
+    const applyPatternBulkRate = async (rate) => {
         const p = masterProducts.find(item => item.patternKey === selectedPattern);
         if (!p) return;
 
         setPatternBulkRate(rate);
         if (rate !== '' && !isNaN(rate)) {
-            [GRADES.G3, GRADES.G4, GRADES.G5, GRADES.SPECIAL, GRADES.MASTER].forEach(g => {
-                discountService.setPatternDiscount(p.brand, p.pattern, p.model, g, rate);
-            });
+            for (const g of [GRADES.G3, GRADES.G4, GRADES.G5, GRADES.SPECIAL, GRADES.MASTER]) {
+                await discountService.setPatternDiscount(p.brand, p.pattern, p.model, g, rate);
+            }
             setDiscounts({ ...discountService.getAllDiscounts() });
         }
     };
 
-    const handleSizeUpdate = (size, grade, rate) => {
-        discountService.setSizeDiscount(size, grade, rate);
+    const handleSizeUpdate = async (size, grade, rate) => {
+        await discountService.setSizeDiscount(size, grade, rate);
         setDiscounts({ ...discountService.getAllDiscounts() });
     };
 
@@ -554,15 +564,30 @@ const AdminPanel = ({ products }) => {
                                                     // Add alphanumeric sort for sizes
                                                     displayItems.sort((a, b) => (a.size || '').localeCompare(b.size || '', undefined, { numeric: true }));
                                                 } else {
-                                                    // Default: Show all filtered by search/brand if no specific pattern selected
+                                                    // Filter by ALLOWED_BRANDS + search/brand
                                                     displayItems = fullMasterData
-                                                        .filter(p => selectedBrand === 'All' || p.brand === selectedBrand)
-                                                        .filter(p =>
-                                                            p.pattern?.toLowerCase().includes(discountSearch.toLowerCase()) ||
-                                                            p.model?.toLowerCase().includes(discountSearch.toLowerCase()) ||
-                                                            p.size?.toLowerCase().includes(discountSearch.toLowerCase())
-                                                        )
-                                                        .slice(0, 100);
+                                                        .filter(d => {
+                                                            const b = (d.brand || '').trim();
+                                                            if (!b) return false;
+                                                            return ALLOWED_BRANDS.some(allowed =>
+                                                                b.toLowerCase().includes(allowed.toLowerCase()) ||
+                                                                allowed.toLowerCase().includes(b.toLowerCase())
+                                                            );
+                                                        })
+                                                        .filter(p => {
+                                                            if (selectedBrand === 'All') return true;
+                                                            const pBrand = (p.brand || '').trim();
+                                                            return pBrand === selectedBrand.trim();
+                                                        })
+                                                        .filter(p => {
+                                                            const search = discountSearch.toLowerCase();
+                                                            if (!search) return true;
+                                                            return (p.pattern || '').toLowerCase().includes(search) ||
+                                                                (p.model || '').toLowerCase().includes(search) ||
+                                                                (p.size || '').toLowerCase().includes(search) ||
+                                                                (p.code || '').toLowerCase().includes(search);
+                                                        })
+                                                        .slice(0, 500); // Increased slice to show more matches
                                                 }
 
                                                 return displayItems.map(p => (

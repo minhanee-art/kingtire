@@ -1,4 +1,6 @@
-// Simple local ID generator since npm install failed
+import { supabase } from './supabaseClient';
+
+// Simple local ID generator
 const generateId = () => Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
 
 // Simple mock storage keys
@@ -34,6 +36,24 @@ class AuthService {
             }
         ];
         this.currentUser = JSON.parse(localStorage.getItem(SESSION_KEY)) || null;
+
+        // Initialize state from Supabase if available
+        if (supabase) {
+            this.syncFromSupabase();
+        }
+    }
+
+    async syncFromSupabase() {
+        try {
+            const { data, error } = await supabase.from('users').select('*');
+            if (error) throw error;
+            if (data && data.length > 0) {
+                this.users = data;
+                this._saveUsers();
+            }
+        } catch (err) {
+            console.warn('Failed to sync users from Supabase:', err.message);
+        }
     }
 
     _saveUsers() {
@@ -44,7 +64,7 @@ class AuthService {
         localStorage.setItem(SESSION_KEY, JSON.stringify(this.currentUser));
     }
 
-    signup(userData) {
+    async signup(userData) {
         const newUser = {
             id: generateId(),
             ...userData,
@@ -52,13 +72,33 @@ class AuthService {
             isApproved: false,
             createdAt: new Date().toISOString()
         };
+
+        if (supabase) {
+            const { error } = await supabase.from('users').insert([newUser]);
+            if (error) throw error;
+        }
+
         this.users.push(newUser);
         this._saveUsers();
         return newUser;
     }
 
-    login(email, password) {
-        const user = this.users.find(u => u.email === email && u.password === password);
+    async login(email, password) {
+        let user;
+        if (supabase) {
+            const { data, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('email', email)
+                .eq('password', password)
+                .single();
+
+            if (error && error.code !== 'PGRST116') throw new Error('로그인 중 오류가 발생했습니다.');
+            user = data;
+        } else {
+            user = this.users.find(u => u.email === email && u.password === password);
+        }
+
         if (user) {
             this.currentUser = user;
             this._saveSession();
@@ -76,7 +116,15 @@ class AuthService {
         return this.users;
     }
 
-    updateUserGrade(userId, newGrade) {
+    async updateUserGrade(userId, newGrade) {
+        if (supabase) {
+            const { error } = await supabase
+                .from('users')
+                .update({ grade: newGrade, isApproved: true })
+                .eq('id', userId);
+            if (error) throw error;
+        }
+
         const user = this.users.find(u => u.id === userId);
         if (user) {
             user.grade = newGrade;
@@ -89,7 +137,12 @@ class AuthService {
         }
     }
 
-    deleteUser(userId) {
+    async deleteUser(userId) {
+        if (supabase) {
+            const { error } = await supabase.from('users').delete().eq('id', userId);
+            if (error) throw error;
+        }
+
         const index = this.users.findIndex(u => u.id === userId);
         if (index !== -1) {
             this.users.splice(index, 1);
@@ -106,8 +159,26 @@ class AuthService {
         return this.currentUser;
     }
 
-    changePassword(oldPassword, newPassword) {
+    async changePassword(oldPassword, newPassword) {
         if (!this.currentUser) throw new Error('로그인이 필요합니다.');
+
+        if (supabase) {
+            const { data: user, error: fetchError } = await supabase
+                .from('users')
+                .select('password')
+                .eq('id', this.currentUser.id)
+                .single();
+
+            if (fetchError || user.password !== oldPassword) {
+                throw new Error('현재 비밀번호가 일치하지 않습니다.');
+            }
+
+            const { error: updateError } = await supabase
+                .from('users')
+                .update({ password: newPassword })
+                .eq('id', this.currentUser.id);
+            if (updateError) throw updateError;
+        }
 
         const user = this.users.find(u => u.id === this.currentUser.id);
         if (!user || user.password !== oldPassword) {
@@ -121,8 +192,16 @@ class AuthService {
         return true;
     }
 
-    updateProfile(updatedData) {
+    async updateProfile(updatedData) {
         if (!this.currentUser) throw new Error('로그인이 필요합니다.');
+
+        if (supabase) {
+            const { error } = await supabase
+                .from('users')
+                .update(updatedData)
+                .eq('id', this.currentUser.id);
+            if (error) throw error;
+        }
 
         const index = this.users.findIndex(u => u.id === this.currentUser.id);
         if (index === -1) throw new Error('사용자를 찾을 수 없습니다.');
@@ -138,75 +217,99 @@ class AuthService {
 class DiscountService {
     constructor() {
         this.discounts = JSON.parse(localStorage.getItem(DISCOUNTS_KEY)) || {};
+        if (supabase) {
+            this.syncFromSupabase();
+        }
+    }
+
+    async syncFromSupabase() {
+        try {
+            const { data, error } = await supabase.from('discounts').select('*');
+            if (error) throw error;
+            if (data) {
+                const discountMap = {};
+                data.forEach(item => {
+                    discountMap[item.key] = item.rates;
+                });
+                this.discounts = discountMap;
+                this._saveDiscounts();
+            }
+        } catch (err) {
+            console.warn('Failed to sync discounts from Supabase:', err.message);
+        }
+    }
+
+    async _saveToSupabase(key, rates) {
+        if (!supabase) return;
+        try {
+            const { error } = await supabase
+                .from('discounts')
+                .upsert({ key, rates }, { onConflict: 'key' });
+            if (error) throw error;
+        } catch (err) {
+            console.error('Supabase discount save failed:', err.message);
+        }
     }
 
     _saveDiscounts() {
         localStorage.setItem(DISCOUNTS_KEY, JSON.stringify(this.discounts));
     }
 
-    // Set discount for a specific pattern (brand|pattern)
-    setPatternDiscount(brand, pattern, model, grade, rate) {
+    async setPatternDiscount(brand, pattern, model, grade, rate) {
         const key = `${brand}|${pattern}`;
         if (!this.discounts[key]) {
             this.discounts[key] = {};
         }
         this.discounts[key][grade] = Number(rate);
         this._saveDiscounts();
+        await this._saveToSupabase(key, this.discounts[key]);
     }
 
-    // Set discount for a specific size (SIZE|normalizedSize)
-    setSizeDiscount(size, grade, rate) {
+    async setSizeDiscount(size, grade, rate) {
         const key = `SIZE|${size}`;
         if (!this.discounts[key]) {
             this.discounts[key] = {};
         }
         this.discounts[key][grade] = Number(rate);
         this._saveDiscounts();
+        await this._saveToSupabase(key, this.discounts[key]);
     }
 
-    // Get discount for a size
     getSizeDiscount(size, grade) {
         const key = `SIZE|${size}`;
         return this.discounts[key]?.[grade] || 0;
     }
 
-    // Get discount for a pattern
     getPatternDiscount(brand, pattern, model, grade) {
-        // Only return 0 if it's literally not set, but allow ADMIN/MASTER to have discounts if set in DB
         const key = `${brand}|${pattern}`;
         return this.discounts[key]?.[grade] || 0;
     }
 
-    // Set discount for a specific product code (highest priority)
-    setCodeDiscount(code, grade, rate) {
+    async setCodeDiscount(code, grade, rate) {
         if (!this.discounts[code]) {
             this.discounts[code] = {};
         }
         this.discounts[code][grade] = Number(rate);
         this._saveDiscounts();
+        await this._saveToSupabase(code, this.discounts[code]);
     }
 
-    // Legacy/Core method updated for new pattern key
     getDiscount(productCode, brand, pattern, model, grade, sizeStr = '') {
-        // Priority 1: Specific product code discount (if exists)
         if (this.discounts[productCode]?.[grade] !== undefined) {
             return this.discounts[productCode][grade];
         }
 
-        // Priority 2: Pattern-based discount (brand|pattern)
         const key = `${brand}|${pattern}`;
         if (this.discounts[key]?.[grade] !== undefined) {
             return this.discounts[key][grade];
         }
 
-        // Priority 3: Size-based discount (SIZE|normalizedSize)
-        const sizeInput = sizeStr || productCode; // fallback if size not provided
+        const sizeInput = sizeStr || productCode;
         const sizeKey = `SIZE|${String(sizeInput || '').replace(/[^0-9]/g, '')}`;
         if (this.discounts[sizeKey]?.[grade] !== undefined) {
             return this.discounts[sizeKey][grade];
         }
 
-        // Priority 4: Model-based fallback (brand|model)
         const modelKey = `${brand}|${model}`;
         if (this.discounts[modelKey]?.[grade] !== undefined) {
             return this.discounts[modelKey][grade];

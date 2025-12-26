@@ -34,10 +34,10 @@ const Signup = ({ onSwitchToLogin, onSignupSuccess }) => {
         }
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            authService.signup(formData);
+            await authService.signup(formData);
             setIsSuccess(true);
             setTimeout(() => {
                 if (onSignupSuccess) onSignupSuccess();

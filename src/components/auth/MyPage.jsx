@@ -41,7 +41,7 @@ const MyPage = ({ user, onClose, onUpdateUser }) => {
 
         setIsSubmitting(true);
         try {
-            authService.changePassword(currentPassword, newPassword);
+            await authService.changePassword(currentPassword, newPassword);
             setMessage({ type: 'success', text: '비밀번호가 성공적으로 변경되었습니다.' });
             setCurrentPassword('');
             setNewPassword('');
@@ -56,7 +56,7 @@ const MyPage = ({ user, onClose, onUpdateUser }) => {
     const handleProfileUpdate = async () => {
         setIsSubmitting(true);
         try {
-            const updated = authService.updateProfile(editableData);
+            const updated = await authService.updateProfile(editableData);
             if (onUpdateUser) onUpdateUser(updated);
             setMessage({ type: 'success', text: '회원 정보가 수정되었습니다.' });
             setIsEditing(false);

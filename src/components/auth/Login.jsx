@@ -5,10 +5,10 @@ import { authService } from '../../services/AuthService';
 const Login = ({ onLoginSuccess, onSwitchToSignup }) => {
     const [formData, setFormData] = useState({ email: '', password: '' });
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const user = authService.login(formData.email, formData.password);
+            const user = await authService.login(formData.email, formData.password);
             onLoginSuccess(user);
         } catch (error) {
             alert(error.message);

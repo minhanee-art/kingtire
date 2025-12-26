@@ -6,7 +6,7 @@ const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT
 // Cache configuration
 let cachedSheetData = null;
 let lastFetchTime = 0;
-const CACHE_TTL = 5 * 60 * 1000; // Increased to 5 minutes
+const CACHE_TTL = 5 * 60 * 1000;
 let sizeIndex = new Map(); // Store products grouped by normalized size for O(1) lookups
 
 /**
@@ -20,8 +20,7 @@ export const googleSheetService = {
     fetchSheetData: async (forceRefresh = false) => {
         const now = Date.now();
         if (!forceRefresh && cachedSheetData && (now - lastFetchTime < CACHE_TTL)) {
-            console.log('Serving Google Sheet data from cache');
-            return Promise.resolve(cachedSheetData);
+            return cachedSheetData;
         }
 
         try {
@@ -79,9 +78,13 @@ export const googleSheetService = {
                                 }
                             });
 
+                            // Pre-normalize size for performance
+                            const normSize = size.replace(/[^0-9]/g, '');
+
                             return {
                                 code: code,
                                 size: size,
+                                normSize: normSize, // Added for optimization
                                 brand: brand,
                                 model: model,
                                 pattern: pattern,
@@ -101,14 +104,13 @@ export const googleSheetService = {
                         cachedSheetData = parsedData;
                         lastFetchTime = Date.now();
 
-                        // Build Size Index
+                        // Build Size Index (References to existing objects to save memory)
                         const newSizeIndex = new Map();
                         parsedData.forEach(p => {
-                            const normSize = p.size.replace(/[^0-9]/g, '');
-                            if (!newSizeIndex.has(normSize)) {
-                                newSizeIndex.set(normSize, []);
+                            if (!newSizeIndex.has(p.normSize)) {
+                                newSizeIndex.set(p.normSize, []);
                             }
-                            newSizeIndex.get(normSize).push(p);
+                            newSizeIndex.get(p.normSize).push(p);
                         });
                         sizeIndex = newSizeIndex;
 
@@ -149,5 +151,15 @@ export const googleSheetService = {
     getBySize: (sizeStr) => {
         const norm = (sizeStr || '').replace(/[^0-9]/g, '');
         return sizeIndex.get(norm) || [];
+    },
+
+    /**
+     * Purge all cached data to free memory.
+     */
+    purgeCache: () => {
+        cachedSheetData = null;
+        sizeIndex.clear();
+        lastFetchTime = 0;
+        console.log('[Sheet] Cache purged');
     }
 };

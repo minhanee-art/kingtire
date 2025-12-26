@@ -5,8 +5,9 @@ class InventoryService {
         this.products = [];
         this.inventory = [];
         this.initialized = false;
-        this.apiCache = new Map(); // Cache API results: key is sizeSearch, value is { data, expiry }
-        this.API_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+        this.apiCache = new Map();
+        this.API_CACHE_TTL = 2 * 60 * 1000;
+        this.MAX_CACHE_SIZE = 50; // Prevent unbounded growth
     }
 
     /**
@@ -87,7 +88,12 @@ class InventoryService {
 
                 const parsedData = this.parseShopData(text);
 
-                // 2. Save to Cache
+                // 2. Save to Cache with Size Management
+                if (this.apiCache.size >= this.MAX_CACHE_SIZE) {
+                    const firstKey = this.apiCache.keys().next().value;
+                    this.apiCache.delete(firstKey);
+                }
+
                 this.apiCache.set(sizeSearch, {
                     data: parsedData,
                     expiry: Date.now() + this.API_CACHE_TTL
@@ -237,6 +243,7 @@ class InventoryService {
 
         return this.products.filter(p => {
             const matchesQuery = !lowerQuery ||
+                (p.normSize && lowerQuery.includes(p.normSize)) ||
                 p.size.includes(lowerQuery) ||
                 p.model.toLowerCase().includes(lowerQuery) ||
                 p.brand.toLowerCase().includes(lowerQuery);
@@ -476,6 +483,11 @@ class InventoryService {
             console.error("Failed to fetch product details:", error);
             return null;
         }
+    }
+
+    purgeCache() {
+        this.apiCache.clear();
+        console.log('[Inventory] Cache purged');
     }
 }
 
