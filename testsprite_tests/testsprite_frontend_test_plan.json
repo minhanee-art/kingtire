@@ -1,0 +1,409 @@
+[
+  {
+    "id": "TC001",
+    "title": "User Registration with Membership Tier Assignment",
+    "description": "Verify that a new user can register successfully and is assigned the correct membership tier based on input data.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to registration page"
+      },
+      {
+        "type": "action",
+        "description": "Input valid user details including required membership information"
+      },
+      {
+        "type": "action",
+        "description": "Submit the registration form"
+      },
+      {
+        "type": "assertion",
+        "description": "Check registration success confirmation is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Validate that the user's membership level is correctly assigned in the system"
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "User Login with Membership Level Verification",
+    "description": "Verify that a registered user can log in successfully and that the correct membership level is reflected in the user session.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to login page"
+      },
+      {
+        "type": "action",
+        "description": "Input valid username and password for a registered user"
+      },
+      {
+        "type": "action",
+        "description": "Click the login button"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm login is successful and user dashboard or homepage is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that membership level data is accessible and correctly shown in user profile or UI elements"
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Tire Search with Valid Filters",
+    "description": "Verify that searching tires with various valid filter combinations returns accurate and relevant product results from proxy API.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the tire search page"
+      },
+      {
+        "type": "action",
+        "description": "Apply filter: size (e.g., 205/55 R16)"
+      },
+      {
+        "type": "action",
+        "description": "Apply filter: brand (e.g., Michelin)"
+      },
+      {
+        "type": "action",
+        "description": "Apply filter: product type"
+      },
+      {
+        "type": "action",
+        "description": "Apply filter: inventory availability"
+      },
+      {
+        "type": "action",
+        "description": "Apply filter: DOT codes"
+      },
+      {
+        "type": "action",
+        "description": "Click search button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify API /api/shop is called with all filters applied"
+      },
+      {
+        "type": "assertion",
+        "description": "Check the displayed search results match the filter criteria"
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Search with No Matching Results",
+    "description": "Verify the system behavior and UI when search filters yield no tire results.",
+    "category": "error handling",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to tire search page"
+      },
+      {
+        "type": "action",
+        "description": "Input filter combination guaranteed to yield no results (e.g., nonexistent brand + size)"
+      },
+      {
+        "type": "action",
+        "description": "Execute search"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm API returns empty result set"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify user is shown a meaningful 'no results found' message"
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Shopping Cart Comparison Feature - Add and Compare Tires",
+    "description": "Verify users can add multiple tires to the comparison cart and view a side-by-side comparison correctly.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Search tires and select multiple from the result list"
+      },
+      {
+        "type": "action",
+        "description": "Add selected tires to the comparison cart"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to comparison cart page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify all added tires are listed correctly in the cart"
+      },
+      {
+        "type": "assertion",
+        "description": "Validate that side-by-side comparison details are shown for each tire attribute"
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Quote Generation Functionality",
+    "description": "Verify the quote feature generates valid and actionable price quotes for selected tires.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Select one or more tires from search results or comparison cart"
+      },
+      {
+        "type": "action",
+        "description": "Access quote generation feature"
+      },
+      {
+        "type": "action",
+        "description": "Submit quote request with required user details"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm that a quote confirmation message is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Validate quote details are accurate and stored or retrievable by the user"
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Store Mode Activation and Consultation Display",
+    "description": "Verify store personnel can activate store mode to provide live consultation and display available tires to customers correctly.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login as store personnel"
+      },
+      {
+        "type": "action",
+        "description": "Activate store mode from the control panel"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm store mode is enabled successfully"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that customers see the live consultation interface with correct tire inventory displayed"
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "KakaoTalk Message Sending by Membership Level",
+    "description": "Verify the system sends KakaoTalk messages targeted and tailored correctly according to user membership levels for marketing or support.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login as admin or system component responsible for messaging"
+      },
+      {
+        "type": "action",
+        "description": "Trigger KakaoTalk message sending targeted by membership tier"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify messages are dispatched only to users with specified membership levels"
+      },
+      {
+        "type": "assertion",
+        "description": "Validate message content is appropriate for each membership tier"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm no unauthorized recipients receive the message"
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "Inventory API Proxy /api/inventory Success and Data Validation",
+    "description": "Verify that the inventory proxy API endpoint responds successfully and returns valid inventory data from blackcircles.co.kr.",
+    "category": "integration",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send a GET request to /api/inventory with valid parameters"
+      },
+      {
+        "type": "assertion",
+        "description": "Ensure the API responds with HTTP status 200"
+      },
+      {
+        "type": "assertion",
+        "description": "Validate the response JSON contains expected fields and data formats for inventory"
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "Shop API Proxy /api/shop Search Response Validation",
+    "description": "Verify that the shop proxy API endpoint returns valid and accurate tire product search data corresponding to search parameters.",
+    "category": "integration",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send a GET request to /api/shop with usual search filter parameters"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm API responds with HTTP status 200"
+      },
+      {
+        "type": "assertion",
+        "description": "Validate response JSON data correctness and completeness of tire product information"
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Invalid Login Credentials Handling",
+    "description": "Verify that login attempts with invalid credentials are rejected and proper error messages are shown.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to login page"
+      },
+      {
+        "type": "action",
+        "description": "Enter invalid username and/or password"
+      },
+      {
+        "type": "action",
+        "description": "Click the login button"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify login failure with appropriate error message is displayed"
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Quote Generation with No Tires Selected",
+    "description": "Verify that attempting to generate a quote without selecting any tires prompts an appropriate error or warning.",
+    "category": "error handling",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to quote generation page without adding any tires"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to submit a quote request"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that the system prevents submission and displays an informative error message"
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Search API Handles Invalid Filter Parameters Gracefully",
+    "description": "Verify the search API proxy returns errors or empty results as appropriate without crashing when invalid or malformed filter parameters are sent.",
+    "category": "error handling",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send request to /api/shop with invalid filter parameters (e.g., malformed size, unknown brand)"
+      },
+      {
+        "type": "assertion",
+        "description": "Validate API returns a proper error response or an empty result set"
+      },
+      {
+        "type": "assertion",
+        "description": "Application UI handles the error gracefully without crashing and shows meaningful feedback"
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Membership Tier Changes Propagate Correctly on Login",
+    "description": "Verify that when a user's membership tier is updated in the database, the changes are reflected correctly upon their next login.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Update the membership tier for an existing user in the backend"
+      },
+      {
+        "type": "action",
+        "description": "Log out the user if logged in"
+      },
+      {
+        "type": "action",
+        "description": "Log back in using the user's credentials"
+      },
+      {
+        "type": "assertion",
+        "description": "Check that the new membership tier is correctly reflected in the user profile and UI elements"
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Store Mode Deactivation and Return to Normal User Mode",
+    "description": "Verify store personnel can deactivate store mode and the system correctly reverts to normal user interface.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Login as store personnel"
+      },
+      {
+        "type": "action",
+        "description": "Activate store mode"
+      },
+      {
+        "type": "action",
+        "description": "Deactivate store mode"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that store mode is fully disabled"
+      },
+      {
+        "type": "assertion",
+        "description": "Confirm normal user interface is restored and no consultation features are visible"
+      }
+    ]
+  }
+]

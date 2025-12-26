@@ -1,0 +1,63 @@
+{
+    "tech_stack": [
+        "javascript",
+        "react",
+        "vite",
+        "supabase",
+        "tailwindcss"
+    ],
+    "features": [
+        {
+            "name": "Inventory Management",
+            "description": "Proxied API to blackcircles.co.kr for fetching tire stock information.",
+            "files": [
+                "vite.config.js"
+            ],
+            "api_doc": {
+                "openapi": "3.0.0",
+                "info": {
+                    "title": "Inventory API",
+                    "version": "1.0.0"
+                },
+                "paths": {
+                    "/api/inventory": {
+                        "get": {
+                            "summary": "Fetch inventory data",
+                            "responses": {
+                                "200": {
+                                    "description": "Success"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "name": "Shop Search",
+            "description": "Proxied API for searching tire products.",
+            "files": [
+                "vite.config.js"
+            ],
+            "api_doc": {
+                "openapi": "3.0.0",
+                "info": {
+                    "title": "Shop API",
+                    "version": "1.0.0"
+                },
+                "paths": {
+                    "/api/shop": {
+                        "get": {
+                            "summary": "Search shop products",
+                            "responses": {
+                                "200": {
+                                    "description": "Success"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}

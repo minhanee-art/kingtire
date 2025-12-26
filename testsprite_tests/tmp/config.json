@@ -1,0 +1,16 @@
+{
+  "status": "commited",
+  "type": "backend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:5173",
+  "backendAuthType": "public",
+  "executionArgs": {
+    "projectName": "kingtire",
+    "projectPath": "c:\\kingtire",
+    "testIds": [],
+    "additionalInstruction": "Navigate to http://localhost:5173. Verify the title \"대동-미쉐린 재고검색\" and ensure the product table or search results load correctly. Focus on E2E testing of the main features.",
+    "envs": {
+      "API_KEY": "sk-user-mVIuVNLiAaAp-QIlg93InDfMScQ80TTSmRq5AeGPf02_DybIPhAGkpR6B5rXAYv2Gl7JIKiDj1gbWLc6y7LzVBwrsh9oTsy5LoysreGmehLK5Wc4OLOiz2LKV9xprOYU_xY"
+    }
+  }
+}

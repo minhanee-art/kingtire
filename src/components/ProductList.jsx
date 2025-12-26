@@ -157,8 +157,9 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
                 const sheetSizeNorm = normalizeSize(d.size);
                 // match if sheet size (e.g. 2454519) matches search query
                 const sizeMatch = sheetSizeNorm.includes(searchSizeNorm) || searchSizeNorm.includes(sheetSizeNorm);
-                // Allow showing products with 0 price if specifically searched (to avoid "No Results" confusion)
-                return sizeMatch;
+
+                // USER REQUEST: Exclude products without a factory price
+                return sizeMatch && d.factoryPrice > 0;
             });
 
             console.log(`[Sheet Data] Found ${filteredSheetEntries.length} matching entries in sheet.`);
@@ -329,25 +330,42 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
         if (isDiscontinued) return false;
 
         // 2. Brand Filter
-        // USER REQUEST: Integrated Hankook + Laufenn
-        // Making this matching more robust by checking both English and Korean names
+        // USER REQUEST: Only include Goodyear, Michelin, Dunlop, Yokohama, Continental, Pirelli, Hankook (+Laufenn)
+        const allowedBrands = ['Goodyear', 'Michelin', 'Dunlop', 'Yokohama', 'Continental', 'Pirelli', 'Hankook'];
+
+        const pBrandKo = getBrandDisplayName(p.brand);
+        const pBrandEng = (p.brand || '').toLowerCase();
+
+        // Check if the product brand is in the allowed list
+        const isBrandAllowed = allowedBrands.some(b => {
+            const bEng = b.toLowerCase();
+            const bKo = getBrandDisplayName(b);
+            // Special case for Continental (often referred to as '콘티')
+            if (bEng === 'continental') {
+                return pBrandEng.includes('continental') || pBrandKo.includes('콘티');
+            }
+            // Special case for Hankook (includes Laufenn)
+            if (bEng === 'hankook') {
+                return pBrandEng.includes('hankook') || pBrandEng.includes('laufenn') || pBrandKo.includes('한국') || pBrandKo.includes('라우펜');
+            }
+            return pBrandEng.includes(bEng) || pBrandKo.includes(bKo);
+        });
+
+        if (!isBrandAllowed) return false;
+
+        // Current UI Brand Filter
         let matchBrand = filter.brand === 'All';
         if (!matchBrand) {
-            const pBrandNum = p.brand.toLowerCase();
-            const pBrandKo = getBrandDisplayName(p.brand);
-
             if (filter.brand === 'Hankook') {
-                // Check for Hankook or Laufenn in various forms
-                matchBrand = pBrandNum.includes('hankook') ||
-                    pBrandNum.includes('laufenn') ||
+                matchBrand = pBrandEng.includes('hankook') ||
+                    pBrandEng.includes('laufenn') ||
                     pBrandKo.includes('한국') ||
                     pBrandKo.includes('라우펜');
             } else {
-                // Check if p.brand (Eng) or its Ko name contains the filter brand (Eng) or its Ko name
                 const targetBrandEng = filter.brand.toLowerCase();
                 const targetBrandKo = getBrandDisplayName(filter.brand);
 
-                matchBrand = pBrandNum.includes(targetBrandEng) ||
+                matchBrand = pBrandEng.includes(targetBrandEng) ||
                     pBrandKo.includes(targetBrandKo);
             }
         }
@@ -556,7 +574,6 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
         'Dunlop',
         'Yokohama',
         'Goodyear',
-        'Kumho',
         'Pirelli',
         'Continental'
     ];
@@ -571,7 +588,7 @@ const ProductList = ({ user, onProductsLoaded, isStoreMode }) => {
     return (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             {/* Premium Toolbar */}
-            <div className="p-5 border-b border-slate-100 bg-slate-50/50">
+            <div className="p-5 border-b border-slate-100 bg-white">
                 <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                     {/* Search & Brand Group */}
                     <div className="flex flex-col sm:flex-row flex-1 gap-3">

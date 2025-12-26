@@ -46,7 +46,9 @@ export const googleSheetService = {
                             // Extract Key Fields
                             const code = (normalizedRow['code'] || normalizedRow['코드'] || normalizedRow['고유코드']) ? String(normalizedRow['code'] || normalizedRow['코드'] || normalizedRow['고유코드']).trim() : '';
                             const size = (normalizedRow['size'] || normalizedRow['규격'] || normalizedRow['규격/사이즈']) ? String(normalizedRow['size'] || normalizedRow['규격'] || normalizedRow['규격/사이즈']).trim() : '';
-                            const brand = (normalizedRow['brand'] || normalizedRow['브랜드'] || normalizedRow['제조사']) ? String(normalizedRow['brand'] || normalizedRow['브랜드'] || normalizedRow['제조사']).trim() : '';
+                            let brand = (normalizedRow['brand'] || normalizedRow['브랜드'] || normalizedRow['제조사']) ? String(normalizedRow['brand'] || normalizedRow['브랜드'] || normalizedRow['제조사']).trim() : '';
+                            if (brand === '요코') brand = '요코하마';
+
                             const model = (normalizedRow['model'] || normalizedRow['상품명'] || normalizedRow['모델명']) ? String(normalizedRow['model'] || normalizedRow['상품명'] || normalizedRow['모델명']).trim() : '';
                             const pattern = (normalizedRow['pattern'] || normalizedRow['patten'] || normalizedRow['패턴']) ? String(normalizedRow['pattern'] || normalizedRow['patten'] || normalizedRow['패턴']).trim() : '';
                             const priceCol = normalizedRow['factory price'] || normalizedRow['공장도'] || normalizedRow['공장도가'] || normalizedRow['공장'] || normalizedRow['price'];
@@ -93,6 +95,15 @@ export const googleSheetService = {
                                 features: features ? features.split(',').map(f => f.trim()) : [],
                                 imageUrl: imageUrl.trim()
                             };
+                        }).filter(row => {
+                            // USER REQUEST: Clean up data by removing #N/A entries
+                            const criticalFields = [row.code, row.size, row.brand, row.model];
+                            return !criticalFields.some(field =>
+                                !field ||
+                                field.toString().toUpperCase() === '#N/A' ||
+                                field.toString().toUpperCase() === 'N/A' ||
+                                field.toString().trim() === ''
+                            );
                         });
 
                         console.log(`[DEBUG] Google Sheet: Parsed ${parsedData.length} rows.`);

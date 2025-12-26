@@ -1,0 +1,106 @@
+{
+  "meta": {
+    "project": "KingTire Tire Inventory Search Website",
+    "date": "2025-12-22",
+    "prepared_by": "Software Development Manager"
+  },
+  "product_overview": "KingTire is a web platform that enables users to search and compare tire inventories with enhanced features such as membership management, shopping cart comparisons, and consultation modes for stores.",
+  "core_goals": [
+    "Provide accurate and real-time tire inventory data via proxy integration with blackcircles.co.kr.",
+    "Enable comprehensive tire search filters including size, brand, product, inventory availability, and DOT codes.",
+    "Facilitate user membership registration with tiered membership levels for personalized experiences.",
+    "Allow users to compare selected tires via a shopping cart-like comparison feature.",
+    "Offer a quote generation function to support purchase decisions.",
+    "Support store mode for live consultations displaying available tires to regular customers.",
+    "Implement communication via KakaoTalk messaging tailored by membership levels."
+  ],
+  "key_features": [
+    "Membership registration with tiered member management.",
+    "Advanced tire search filtered by size, brand, product, inventory status, and DOT codes.",
+    "Shopping cart comparison for evaluating multiple tire options.",
+    "Quote function to request price estimates or information.",
+    "Store mode enabling consultations with customers while displaying tire selections.",
+    "KakaoTalk messaging integration to send messages based on membership level.",
+    "Proxy API integration for fetching tire inventory and product search data from blackcircles.co.kr."
+  ],
+  "user_flow_summary": [
+    "User registers and logs in with membership credentials reflecting membership level.",
+    "User searches tires using multiple filters such as size, brand, product, inventory, and DOT.",
+    "User adds selected tires to a comparison cart to evaluate options side-by-side.",
+    "User uses the quote feature to request a price or purchase estimate for selected tires.",
+    "Store personnel activate store mode to provide live consultation to customers while showcasing tire inventory.",
+    "System sends targeted KakaoTalk messages to users according to their membership tier for marketing or support."
+  ],
+  "validation_criteria": [
+    "Successful registration and login of users with appropriate membership levels.",
+    "Accurate search results from the proxy APIs according to the applied filters.",
+    "Functional shopping cart comparison allowing multiple tire selections and side-by-side comparison.",
+    "Correct operation of the quote feature generating valid and actionable price quotes.",
+    "Store mode enables consultation functionality and displays tires correctly to customers.",
+    "KakaoTalk message sending works by membership level accurately and reliably.",
+    "API proxy endpoints (/api/inventory and /api/shop) respond with success and valid data."
+  ],
+  "code_summary": {
+    "tech_stack": [
+      "javascript",
+      "react",
+      "vite",
+      "supabase",
+      "tailwindcss"
+    ],
+    "features": [
+      {
+        "name": "Inventory Management",
+        "description": "Proxied API to blackcircles.co.kr for fetching tire stock information.",
+        "files": [
+          "vite.config.js"
+        ],
+        "api_doc": {
+          "openapi": "3.0.0",
+          "info": {
+            "title": "Inventory API",
+            "version": "1.0.0"
+          },
+          "paths": {
+            "/api/inventory": {
+              "get": {
+                "summary": "Fetch inventory data",
+                "responses": {
+                  "200": {
+                    "description": "Success"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "name": "Shop Search",
+        "description": "Proxied API for searching tire products.",
+        "files": [
+          "vite.config.js"
+        ],
+        "api_doc": {
+          "openapi": "3.0.0",
+          "info": {
+            "title": "Shop API",
+            "version": "1.0.0"
+          },
+          "paths": {
+            "/api/shop": {
+              "get": {
+                "summary": "Search shop products",
+                "responses": {
+                  "200": {
+                    "description": "Success"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}
