@@ -437,7 +437,7 @@ const AdminPanel = ({ products }) => {
                                         <h5 className="text-xs font-black text-slate-700 flex items-center gap-2">
                                             <Upload size={14} className="text-green-600" /> 엑셀(CSV) 일괄 업로드
                                         </h5>
-                                        <a href="/public/251225_all_code.csv" download className="text-[10px] text-blue-500 underline hover:text-blue-700">샘플(현재파일) 다운로드</a>
+                                        <a href="/251225_all_code.csv" download className="text-[10px] text-blue-500 underline hover:text-blue-700">샘플(현재파일) 다운로드</a>
                                     </div>
                                     <p className="text-[10px] text-slate-400 mb-3">
                                         * code, price3, price4, price5, Special 컬럼이 포함된 CSV 파일을 업로드하세요.
