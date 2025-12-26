@@ -64,11 +64,6 @@ body {
 
 /* Dark Mode Utilities - Refinement for higher contrast */
 
-
-.dark .bg-slate-50 {
-  @apply bg-[#0B0F1A] !important;
-}
-
 .dark .text-slate-900 {
   @apply text-white !important;
 }
